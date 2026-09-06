@@ -1,102 +1,163 @@
-const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
 
-const User = require('./models/User');
-const Leave = require('./models/Leave');
-const { verifyToken, requireAdmin } = require('./middleware/auth');
-
 const app = express();
-app.use(cors());
+
+// Middleware
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Google Client Setup
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '781582920391-n1g2a0eud2i0kqchlrbtqjou3ssgln4n.apps.googleusercontent.com';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_123';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-// ---------------- AUTH & PROFILE ROUTES ----------------
+// User Schema & Model
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  picture: String,
+  role: { type: String, default: 'employee' },
+  empCode: { type: String, default: '3132' },
+  gender: { type: String, default: 'Male' },
+  department: { type: String, default: 'IT' },
+  designation: { type: String, default: 'A.G.M' },
+  costCenter: { type: String, default: 'IT' },
+  dob: { type: String, default: '1976-04-08' },
+  doj: { type: String, default: '2023-01-15' },
+  phone: { type: String, default: '' }
+}, { timestamps: true });
 
-// Standard Email/Password Login
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+// Leave Schema & Model
+const leaveSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  leaveType: { type: String, default: 'CL', enum: ['CL', 'EL', 'CO'] },
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true },
+  reason: { type: String, required: true },
+  status: { type: String, default: 'Pending', enum: ['Pending', 'Approved', 'Rejected'] }
+}, { timestamps: true });
+
+const Leave = mongoose.models.Leave || mongoose.model('Leave', leaveSchema);
+// Auth Middleware (Routes se pehle hona zaroori hai)
+const auth = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ message: 'No token, authorization denied' });
 
   try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
+// ================= ROUTES ================= //
+
+// 1. Admin Add Employee Route
+app.post('/api/admin/add-employee', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Only Admins can add employees.' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    const { empCode, name, email, department, designation, gender, doj } = req.body;
+
+    if (!empCode || !name) {
+      return res.status(400).json({ message: 'Emp Code aur Name zaroori hain!' });
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const cleanCode = empCode.trim().toUpperCase();
 
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        empCode: user.empCode || '',
-        gender: user.gender || '',
-        department: user.department || '',
-        designation: user.designation || '',
-        costCenter: user.costCenter || '',
-        dob: user.dob || '',
-        doj: user.doj || ''
-      }
+    const existing = await User.findOne({ empCode: cleanCode });
+    if (existing) {
+      return res.status(400).json({ message: `Emp Code ${cleanCode} pehle se registered hai!` });
+    }
+
+    const newEmp = new User({
+      empCode: cleanCode,
+      name,
+      email: email || `${cleanCode.toLowerCase()}@company.com`,
+      password: cleanCode, // Default password = Emp Code
+      role: 'employee',
+      department: department || 'IT',
+      designation: designation || 'Executive',
+      gender: gender || 'Male',
+      doj: doj || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     });
-  } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ message: 'Server error during login' });
+
+    await newEmp.save();
+    res.status(201).json({ message: 'Employee successfully add ho gaya!', employee: newEmp });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Google OAuth Login
-app.post('/api/auth/google', async (req, res) => {
-  const { credential } = req.body;
-
-  if (!credential) {
-    return res.status(400).json({ message: 'Credential token is required' });
-  }
-
+// 2. Fetch All Employees Directory
+app.get('/api/admin/employees', auth, async (req, res) => {
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
+    const employees = await User.find({ role: 'employee' }).sort({ createdAt: -1 });
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch employees' });
+  }
+});
 
-    const payload = ticket.getPayload();
-    const { email, name } = payload;
+// 1. Emp Code Login Route
+app.post('/api/auth/login-emp', async (req, res) => {
+  try {
+    const { empCode, password, role } = req.body;
+    const cleanCode = (empCode || '').trim().toUpperCase();
 
-    let user = await User.findOne({ email });
+    // 👉 HARDCODED ADMIN BYPASS (Koi database check nahi, seedha Login)
+    if (role === 'admin' || cleanCode === 'ADMIN') {
+      const adminToken = jwt.sign(
+        { id: 'admin_root_123', empCode: 'ADMIN', role: 'admin' },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
-    if (!user) {
-      user = await User.create({
-        name,
-        email,
-        password: await bcrypt.hash(Math.random().toString(36), 10),
-        role: 'employee'
+      return res.json({
+        token: adminToken,
+        user: {
+          id: 'admin_root_123',
+          name: 'System Administrator',
+          email: 'admin@company.com',
+          empCode: 'ADMIN',
+          role: 'admin',
+          department: 'Management',
+          designation: 'System Admin'
+        }
       });
     }
 
+    // Regular Employee Flow
+    let user = await User.findOne({ empCode: cleanCode });
+    if (!user) {
+      user = new User({
+        name: 'Mr RAJ SANDEEP SINGH',
+        email: `${cleanCode.toLowerCase()}@company.com`,
+        empCode: cleanCode,
+        password: cleanCode,
+        role: 'employee',
+        department: 'IT',
+        designation: 'A.G.M'
+      });
+      await user.save();
+    }
+
     const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { id: user._id, empCode: user.empCode, role: 'employee' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
     );
 
     res.json({
@@ -105,63 +166,73 @@ app.post('/api/auth/google', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        empCode: user.empCode || '',
-        gender: user.gender || '',
-        department: user.department || '',
-        designation: user.designation || '',
-        costCenter: user.costCenter || '',
-        dob: user.dob || '',
-        doj: user.doj || ''
+        empCode: user.empCode,
+        role: 'employee',
+        department: user.department,
+        designation: user.designation
       }
     });
-  } catch (error) {
-    console.error('Google Auth Error:', error);
-    res.status(400).json({ message: 'Google authentication failed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Employee: Update Full HRMS Profile
-app.put('/api/auth/profile', verifyToken, async (req, res) => {
-  const {
-    name,
-    empCode,
-    gender,
-    department,
-    designation,
-    costCenter,
-    dob,
-    doj,
-    password
-  } = req.body;
-
-  if (!name || name.trim() === '') {
-    return res.status(400).json({ message: 'Name is required' });
-  }
-
+// 2. Change Password Route
+app.put('/api/auth/change-password', auth, async (req, res) => {
   try {
+    const { oldPassword, newPassword } = req.body;
     const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+
+    const currentPassword = user.password || user.empCode;
+    if (oldPassword !== currentPassword) {
+      return res.status(400).json({ message: 'Old password galat hai' });
     }
 
-    user.name = name.trim();
-    user.empCode = empCode || '';
-    user.gender = gender || '';
-    user.department = department || '';
-    user.designation = designation || '';
-    user.costCenter = costCenter || '';
-    user.dob = dob || '';
-    user.doj = doj || '';
-
-    if (password && password.trim().length >= 6) {
-      user.password = await bcrypt.hash(password.trim(), 10);
-    }
-
+    user.password = newPassword;
     await user.save();
 
-    res.json({
-      message: 'Profile updated successfully',
+    res.json({ message: 'Password successfully change ho gaya!' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 1. Google Auth Route
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const idToken = req.body.token || req.body.credential;
+    if (!idToken) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = new User({
+        name,
+        email,
+        picture,
+        role: email.includes('admin') ? 'admin' : 'employee'
+      });
+      await user.save();
+    }
+
+    const jwtToken = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      token: jwtToken,
       user: {
         id: user._id,
         name: user.name,
@@ -173,116 +244,131 @@ app.put('/api/auth/profile', verifyToken, async (req, res) => {
         designation: user.designation,
         costCenter: user.costCenter,
         dob: user.dob,
-        doj: user.doj
+        doj: user.doj,
+        phone: user.phone,
+        picture: user.picture
       }
     });
-  } catch (error) {
-    console.error('Update Profile Error:', error);
-    res.status(500).json({ message: 'Failed to update profile' });
+  } catch (err) {
+    console.error('Google Auth Error:', err.message);
+    return res.status(400).json({ message: 'Invalid Google Token', error: err.message });
   }
 });
 
-// ---------------- LEAVE ROUTES ----------------
-
-// Employee: Apply for leave
-app.post('/api/leaves/apply', verifyToken, async (req, res) => {
-  const { reason, days } = req.body;
-
-  if (!reason || !days) {
-    return res.status(400).json({ message: 'Reason and days are required' });
-  }
-
+// 2. Profile Update Route
+app.put('/api/auth/profile', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const newLeave = await Leave.create({
-      applicant: user._id,
-      applicantName: user.name,
-      applicantEmail: user.email,
-      reason,
-      days: Number(days),
-      status: 'Pending'
-    });
-
-    res.status(201).json(newLeave);
-  } catch (error) {
-    console.error('Leave Application Error:', error);
-    res.status(500).json({ message: 'Failed to submit leave application' });
-  }
-});
-
-// Employee: View my leaves
-app.get('/api/leaves/my', verifyToken, async (req, res) => {
-  try {
-    const leaves = await Leave.find({ applicant: req.user.id }).sort({ appliedAt: -1 });
-    res.json(leaves);
-  } catch (error) {
-    console.error('Fetch My Leaves Error:', error);
-    res.status(500).json({ message: 'Failed to retrieve leaves' });
-  }
-});
-
-// Admin: View all leaves
-app.get('/api/leaves/all', verifyToken, requireAdmin, async (req, res) => {
-  try {
-    const allLeaves = await Leave.find().sort({ appliedAt: -1 });
-    res.json(allLeaves);
-  } catch (error) {
-    console.error('Fetch All Leaves Error:', error);
-    res.status(500).json({ message: 'Failed to retrieve leave records' });
-  }
-});
-
-// Admin: Update leave status
-app.patch('/api/leaves/:id/status', verifyToken, requireAdmin, async (req, res) => {
-  const { status } = req.body;
-  const { id } = req.params;
-
-  if (!['Approved', 'Rejected'].includes(status)) {
-    return res.status(400).json({ message: 'Invalid status update' });
-  }
-
-  try {
-    const updatedLeave = await Leave.findByIdAndUpdate(
-      id,
-      { status },
+    const { department, phone, designation, picture } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { department, phone, designation, picture },
       { new: true }
     );
-
-    if (!updatedLeave) {
-      return res.status(404).json({ message: 'Leave record not found' });
-    }
-
-    res.json(updatedLeave);
-  } catch (error) {
-    console.error('Update Status Error:', error);
-    res.status(500).json({ message: 'Failed to update leave status' });
+    res.json({ message: 'Profile updated successfully', user });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// ---------------- DATABASE & SERVER INIT ----------------
-
-mongoose.connect(process.env.MONGO_URI)
-  .then(async () => {
-    console.log('MongoDB Connected Successfully');
-
-    const adminExists = await User.findOne({ email: 'admin@test.com' });
-    if (!adminExists) {
-      const hashPassword = await bcrypt.hash('123456', 10);
-      await User.create([
-        { name: 'Admin User', email: 'admin@test.com', password: hashPassword, role: 'admin' },
-        { name: 'Employee User', email: 'emp@test.com', password: hashPassword, role: 'employee' }
-      ]);
-      console.log('Default users created: admin@test.com & emp@test.com (Password: 123456)');
+// Admin Add New Employee Route
+app.post('/api/admin/add-employee', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
 
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+    const { empCode, name, email, department, designation, gender, doj } = req.body;
+
+    if (!empCode || !name) {
+      return res.status(400).json({ message: 'Emp Code aur Name zaroori hain' });
+    }
+
+    const cleanCode = empCode.trim().toUpperCase();
+
+    // Check duplicate
+    const existing = await User.findOne({ empCode: cleanCode });
+    if (existing) {
+      return res.status(400).json({ message: 'Yeh Emp Code pehle se registered hai!' });
+    }
+
+    const newEmp = new User({
+      empCode: cleanCode,
+      name,
+      email: email || `${cleanCode.toLowerCase()}@company.com`,
+      password: cleanCode, // Default password = Emp Code
+      role: 'employee',
+      department: department || 'IT',
+      designation: designation || 'Executive',
+      gender: gender || 'Male',
+      doj: doj || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     });
+
+    await newEmp.save();
+    res.status(201).json({ message: 'Employee successfully add ho gaya!', employee: newEmp });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 3. Apply Leave Route
+app.post('/api/leaves/apply', auth, async (req, res) => {
+  try {
+    const { leaveType, startDate, endDate, reason } = req.body;
+    const newLeave = new Leave({
+      user: req.user.id,
+      leaveType: leaveType || 'CL',
+      startDate,
+      endDate,
+      reason
+    });
+    await newLeave.save();
+    res.status(201).json(newLeave);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to apply leave' });
+  }
+});
+
+// 4. My Leaves Route
+app.get('/api/leaves/my', auth, async (req, res) => {
+  try {
+    const leaves = await Leave.find({ user: req.user.id }).sort({ createdAt: -1 });
+    res.json(leaves);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 5. Admin: All Leaves Route
+app.get('/api/leaves/all', auth, async (req, res) => {
+  try {
+    const leaves = await Leave.find().populate('user', 'name email department').sort({ createdAt: -1 });
+    res.json(leaves);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 6. Admin: Update Leave Status
+app.put('/api/leaves/status/:id', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updated = await Leave.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
+// DB Connection & Server Start
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/hrms';
+const PORT = process.env.PORT || 5000;
+
+mongoose.connect(MONGO_URI)
+  .then(() => {
+    console.log('MongoDB Connected Successfully');
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch((err) => {
-    console.error('MongoDB Connection Error:', err);
-  });
+  .catch(err => console.error('MongoDB Connection Error:', err));
