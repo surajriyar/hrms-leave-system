@@ -5,6 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+
   const [user, setUser] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
@@ -16,13 +17,15 @@ const AdminDashboard = () => {
   const [leaves, setLeaves] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [filter, setFilter] = useState('ALL');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Tabs: PROFILE -> ADD EMPLOYEE -> REQUISITIONS -> APPROVE REQUISITIONS -> REPORTS
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
   const [activeTab, setActiveTab] = useState('PROFILE');
   const [currentView, setCurrentView] = useState('profile');
 
-  // Add Employee Form States
+  // Add Employee
   const [newEmpCode, setNewEmpCode] = useState('');
   const [newEmpName, setNewEmpName] = useState('');
   const [newEmpEmail, setNewEmpEmail] = useState('');
@@ -31,19 +34,19 @@ const AdminDashboard = () => {
   const [newEmpGender, setNewEmpGender] = useState('Male');
   const [addEmpMsg, setAddEmpMsg] = useState({ type: '', text: '' });
 
-  // Leave Form States (Requisition tab)
+  // Leave
   const [leaveType, setLeaveType] = useState('CL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
 
-  // Password States
+  // Password
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwdMsg, setPwdMsg] = useState({ type: '', text: '' });
 
-  // Profile Edit States
+  // Profile
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [department, setDepartment] = useState(user?.department || 'Management');
   const [designation, setDesignation] = useState(user?.designation || 'System Admin');
@@ -52,13 +55,19 @@ const AdminDashboard = () => {
 
   const token = localStorage.getItem('token');
 
-  // Fetch Leaves
+  // =========================
+  // FETCH LEAVES
+  // =========================
   const fetchAllLeaves = async () => {
     try {
       const res = await fetch(`${API_URL}/api/leaves/all`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
+
       const data = await res.json();
+
       if (res.ok && Array.isArray(data)) {
         setLeaves(data);
       } else {
@@ -70,13 +79,19 @@ const AdminDashboard = () => {
     }
   };
 
-  // Fetch Employees
+  // =========================
+  // FETCH EMPLOYEES
+  // =========================
   const fetchAllEmployees = async () => {
     try {
       const res = await fetch(`${API_URL}/api/admin/employees`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
+
       const data = await res.json();
+
       if (res.ok && Array.isArray(data)) {
         setEmployees(data);
       } else {
@@ -97,10 +112,31 @@ const AdminDashboard = () => {
     }
   }, [token]);
 
-  // Handle Add Employee Submit
+  // =========================
+  // NAVIGATION
+  // =========================
+  const changeTab = (tab, view = null) => {
+    setActiveTab(tab);
+
+    if (view) {
+      setCurrentView(view);
+    }
+
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
+  // =========================
+  // ADD EMPLOYEE
+  // =========================
   const handleAddEmployee = async (e) => {
     e.preventDefault();
-    setAddEmpMsg({ type: '', text: '' });
+
+    setAddEmpMsg({
+      type: '',
+      text: ''
+    });
 
     try {
       const res = await fetch(`${API_URL}/api/admin/add-employee`, {
@@ -120,31 +156,55 @@ const AdminDashboard = () => {
       });
 
       const data = await res.json();
+
       if (res.ok) {
-        setAddEmpMsg({ type: 'success', text: `Employee ${newEmpName} (${newEmpCode}) successfully add ho gaya! Default password: ${newEmpCode}` });
+        setAddEmpMsg({
+          type: 'success',
+          text: `Employee ${newEmpName} (${newEmpCode}) successfully add ho gaya! Default password: ${newEmpCode}`
+        });
+
         setNewEmpCode('');
         setNewEmpName('');
         setNewEmpEmail('');
+
         fetchAllEmployees();
       } else {
-        setAddEmpMsg({ type: 'error', text: data?.message || 'Employee add karne mein dikkat aayi' });
+        setAddEmpMsg({
+          type: 'error',
+          text: data?.message || 'Employee add karne mein dikkat aayi'
+        });
       }
     } catch (err) {
-      setAddEmpMsg({ type: 'error', text: 'Backend connection error!' });
+      setAddEmpMsg({
+        type: 'error',
+        text: 'Backend connection error!'
+      });
     }
   };
 
+  // =========================
+  // IMAGE
+  // =========================
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
+
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setPicture(reader.result);
+
+      reader.onloadend = () => {
+        setPicture(reader.result);
+      };
+
       reader.readAsDataURL(file);
     }
   };
 
+  // =========================
+  // APPLY LEAVE
+  // =========================
   const handleApplyLeave = async (e) => {
     e.preventDefault();
+
     try {
       const res = await fetch(`${API_URL}/api/leaves/apply`, {
         method: 'POST',
@@ -152,15 +212,24 @@ const AdminDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ leaveType, startDate, endDate, reason })
+        body: JSON.stringify({
+          leaveType,
+          startDate,
+          endDate,
+          reason
+        })
       });
+
       const data = await res.json();
+
       if (res.ok) {
         alert('Leave requisition submitted!');
+
         setStartDate('');
         setEndDate('');
         setReason('');
         setLeaveType('CL');
+
         fetchAllLeaves();
       } else {
         alert(data?.message || 'Error submitting requisition');
@@ -171,6 +240,9 @@ const AdminDashboard = () => {
     }
   };
 
+  // =========================
+  // UPDATE STATUS
+  // =========================
   const handleUpdateStatus = async (id, status) => {
     try {
       const res = await fetch(`${API_URL}/api/leaves/status/${id}`, {
@@ -179,7 +251,9 @@ const AdminDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({
+          status
+        })
       });
 
       if (res.ok) {
@@ -192,12 +266,23 @@ const AdminDashboard = () => {
     }
   };
 
+  // =========================
+  // CHANGE PASSWORD
+  // =========================
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setPwdMsg({ type: '', text: '' });
+
+    setPwdMsg({
+      type: '',
+      text: ''
+    });
 
     if (newPassword !== confirmPassword) {
-      setPwdMsg({ type: 'error', text: 'New password aur Confirm password match nahi ho rahe!' });
+      setPwdMsg({
+        type: 'error',
+        text: 'New password aur Confirm password match nahi ho rahe!'
+      });
+
       return;
     }
 
@@ -208,25 +293,43 @@ const AdminDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ oldPassword, newPassword })
+        body: JSON.stringify({
+          oldPassword,
+          newPassword
+        })
       });
 
       const data = await res.json();
+
       if (res.ok) {
-        setPwdMsg({ type: 'success', text: data?.message || 'Password successfully updated!' });
+        setPwdMsg({
+          type: 'success',
+          text: data?.message || 'Password successfully updated!'
+        });
+
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setPwdMsg({ type: 'error', text: data?.message || 'Password update failed!' });
+        setPwdMsg({
+          type: 'error',
+          text: data?.message || 'Password update failed!'
+        });
       }
     } catch (err) {
-      setPwdMsg({ type: 'error', text: 'Backend connection error!' });
+      setPwdMsg({
+        type: 'error',
+        text: 'Backend connection error!'
+      });
     }
   };
 
+  // =========================
+  // UPDATE PROFILE
+  // =========================
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+
     try {
       const res = await fetch(`${API_URL}/api/auth/profile`, {
         method: 'PUT',
@@ -234,13 +337,26 @@ const AdminDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ department, phone, designation, picture })
+        body: JSON.stringify({
+          department,
+          phone,
+          designation,
+          picture
+        })
       });
+
       const data = await res.json();
+
       if (res.ok) {
         alert('Profile updated successfully!');
+
         setUser(data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
+
+        localStorage.setItem(
+          'user',
+          JSON.stringify(data.user)
+        );
+
         setIsEditModalOpen(false);
       } else {
         alert(data?.message || 'Profile update failed');
@@ -250,6 +366,9 @@ const AdminDashboard = () => {
     }
   };
 
+  // =========================
+  // LOGOUT
+  // =========================
   const handleLogout = () => {
     localStorage.clear();
     navigate('/');
@@ -260,571 +379,1498 @@ const AdminDashboard = () => {
 
   const filteredLeaves = safeLeaves.filter((l) => {
     if (filter === 'ALL') return true;
+
     return l?.status === filter;
   });
 
+  const pendingCount = safeLeaves.filter(
+    (l) => l?.status === 'Pending'
+  ).length;
+
+  const approvedCount = safeLeaves.filter(
+    (l) => l?.status === 'Approved'
+  ).length;
+
+  const rejectedCount = safeLeaves.filter(
+    (l) => l?.status === 'Rejected'
+  ).length;
+
   return (
-    <div style={{ minHeight: '100vh', background: '#fdfbf7', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-      {/* Top Navbar */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '10px 25px',
-        borderBottom: '1px solid #e5dccb',
-        background: '#fff8ee'
-      }}>
-        <div style={{ display: 'flex', gap: '22px', fontWeight: 'bold', fontSize: '13px', color: '#1a365d' }}>
-          {['PROFILE', 'ADD EMPLOYEE', 'REQUISITIONS', 'APPROVE REQUISITIONS', 'REPORTS'].map((tab) => (
-            <span
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab);
-                if (tab === 'PROFILE') setCurrentView('profile');
-              }}
-              style={{
-                cursor: 'pointer',
-                borderBottom: activeTab === tab ? '2px solid #e67e22' : 'none',
-                paddingBottom: '4px',
-                color: activeTab === tab ? '#d35400' : '#1a365d'
-              }}
+    <div className="min-h-screen bg-slate-50 text-slate-800">
+
+      {/* ================================
+          TOP NAVBAR
+      ================================= */}
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+
+        <div className="flex min-h-[70px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+
+          {/* LEFT */}
+          <div className="flex items-center gap-3">
+
+            {/* Mobile Menu */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-xl shadow-sm transition hover:bg-slate-50 lg:hidden"
+              aria-label="Toggle navigation"
             >
-              {tab}
-            </span>
-          ))}
-        </div>
+              ☰
+            </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ fontSize: '12px', color: '#555' }}>
-            Admin: <strong>{user?.name || 'System Admin'}</strong> ({user?.empCode || 'ADMIN'})
-          </span>
-          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#d35400', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
-            🚪 Logout
-          </button>
-          <div style={{
-            background: 'linear-gradient(180deg, #f39c12, #d35400)',
-            color: '#fff',
-            padding: '6px 18px',
-            borderRadius: '15px 0 0 15px',
-            fontWeight: 'bold',
-            fontSize: '13px'
-          }}>
-            Saturday 05 Sep 2026
-          </div>
-        </div>
-      </div>
+            {/* Logo */}
+            <div className="flex items-center gap-3">
 
-      {/* Main Container */}
-      <div style={{ padding: '20px' }}>
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          style={{
-            background: 'linear-gradient(180deg, #ffc97a, #f39c12)',
-            border: '1px solid #c97d10',
-            fontWeight: 'bold',
-            fontSize: '11px',
-            padding: '4px 10px',
-            borderRadius: '3px',
-            cursor: 'pointer',
-            marginBottom: '15px'
-          }}
-        >
-          {sidebarOpen ? 'HIDE NAVIGATION' : 'SHOW NAVIGATION'}
-        </button>
-
-        <div style={{ display: 'flex', gap: '25px', alignItems: 'flex-start' }}>
-          {/* Sidebar */}
-          {sidebarOpen && (
-            <div style={{ width: '220px', flexShrink: 0 }}>
-              <div style={{
-                background: 'linear-gradient(180deg, #f39c12, #e67e22)',
-                color: '#fff',
-                padding: '10px 14px',
-                borderRadius: '6px 6px 0 0',
-                fontWeight: 'bold',
-                fontSize: '14px'
-              }}>
-                🛡️ NAVIGATION
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 text-xl shadow-lg shadow-orange-200">
+                🛡️
               </div>
-              <div style={{ background: '#fff', border: '1px solid #e0d7c7', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
-                <div
-                  onClick={() => { setActiveTab('PROFILE'); setCurrentView('profile'); }}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'PROFILE' && currentView === 'profile' ? 'bold' : 'normal',
-                    borderBottom: '1px solid #f2ece1',
-                    cursor: 'pointer',
-                    background: activeTab === 'PROFILE' && currentView === 'profile' ? '#fff3e0' : 'transparent'
-                  }}
-                >
-                  My Profile
-                </div>
-                <div
-                  onClick={() => setActiveTab('ADD EMPLOYEE')}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'ADD EMPLOYEE' ? 'bold' : 'normal',
-                    borderBottom: '1px solid #f2ece1',
-                    cursor: 'pointer',
-                    background: activeTab === 'ADD EMPLOYEE' ? '#fff3e0' : 'transparent',
-                    color: '#d35400'
-                  }}
-                >
-                  ➕ Add New Employee
-                </div>
-                <div
-                  onClick={() => setActiveTab('REQUISITIONS')}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'REQUISITIONS' ? 'bold' : 'normal',
-                    borderBottom: '1px solid #f2ece1',
-                    cursor: 'pointer',
-                    background: activeTab === 'REQUISITIONS' ? '#fff3e0' : 'transparent'
-                  }}
-                >
-                  Apply Requisition
-                </div>
-                <div
-                  onClick={() => { setActiveTab('APPROVE REQUISITIONS'); setFilter('ALL'); }}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'APPROVE REQUISITIONS' ? 'bold' : 'normal',
-                    borderBottom: '1px solid #f2ece1',
-                    cursor: 'pointer',
-                    background: activeTab === 'APPROVE REQUISITIONS' ? '#fff3e0' : 'transparent'
-                  }}
-                >
-                  Approve Requisitions ({safeLeaves.filter(l => l?.status === 'Pending').length})
-                </div>
-                <div
-                  onClick={() => { setActiveTab('PROFILE'); setCurrentView('change-password'); }}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'PROFILE' && currentView === 'change-password' ? 'bold' : 'normal',
-                    borderBottom: '1px solid #f2ece1',
-                    cursor: 'pointer',
-                    background: activeTab === 'PROFILE' && currentView === 'change-password' ? '#fff3e0' : 'transparent'
-                  }}
-                >
-                  Change Password
-                </div>
-                <div
-                  onClick={() => setActiveTab('REPORTS')}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '12px',
-                    fontWeight: activeTab === 'REPORTS' ? 'bold' : 'normal',
-                    cursor: 'pointer',
-                    background: activeTab === 'REPORTS' ? '#fff3e0' : 'transparent'
-                  }}
-                >
-                  Reports & Summary
-                </div>
+
+              <div className="hidden sm:block">
+                <h1 className="text-base font-extrabold text-slate-900">
+                  Leave Management
+                </h1>
+
+                <p className="text-xs text-slate-500">
+                  Admin Portal
+                </p>
               </div>
+
             </div>
-          )}
+          </div>
 
-          {/* Main Card */}
-          <div style={{
-            flex: 1,
-            background: '#fff',
-            border: '1px solid #e2dcd0',
-            borderRadius: '8px',
-            padding: '25px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
+          {/* DESKTOP TABS */}
+          <nav className="hidden items-center gap-1 lg:flex">
 
-            {/* TAB 1: ADD EMPLOYEE VIEW */}
-            {activeTab === 'ADD EMPLOYEE' && (
+            {[
+              'PROFILE',
+              'ADD EMPLOYEE',
+              'REQUISITIONS',
+              'APPROVE REQUISITIONS',
+              'REPORTS'
+            ].map((tab) => (
+
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+
+                  if (tab === 'PROFILE') {
+                    setCurrentView('profile');
+                  }
+                }}
+                className={`rounded-xl px-3 py-2 text-xs font-bold transition xl:px-4 ${
+                  activeTab === tab
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                {tab}
+              </button>
+
+            ))}
+
+          </nav>
+
+          {/* RIGHT */}
+          <div className="flex items-center gap-3">
+
+            <div className="hidden text-right md:block">
+              <p className="text-xs text-slate-500">
+                Welcome back
+              </p>
+
+              <p className="text-sm font-bold text-slate-800">
+                {user?.name || 'System Admin'}
+              </p>
+            </div>
+
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-500 to-amber-400 font-bold text-white shadow-md">
+
+              {user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt="Admin"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                (user?.name || 'A')
+                  .charAt(0)
+                  .toUpperCase()
+              )}
+
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="hidden rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100 sm:block"
+            >
+              Logout
+            </button>
+
+          </div>
+
+        </div>
+
+      </header>
+
+      {/* ================================
+          MOBILE OVERLAY
+      ================================= */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+        />
+      )}
+
+      {/* ================================
+          SIDEBAR
+      ================================= */}
+      <aside
+        className={`fixed left-0 top-[70px] z-50 h-[calc(100vh-70px)] w-[280px] transform border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-[70px] lg:z-30 lg:float-left lg:h-[calc(100vh-70px)] lg:shadow-none ${
+          sidebarOpen
+            ? 'translate-x-0'
+            : '-translate-x-full lg:-translate-x-full'
+        }`}
+      >
+
+        <div className="flex h-full flex-col">
+
+          {/* Sidebar Header */}
+          <div className="border-b border-slate-200 bg-gradient-to-r from-orange-500 to-amber-400 p-5 text-white">
+
+            <div className="flex items-center justify-between">
+
               <div>
-                <div style={{ borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
-                  <h3 style={{ margin: 0, color: '#c0392b', fontSize: '15px' }}>Add New Employee</h3>
-                  <small style={{ color: '#666' }}>Employee create hote hi uska default password uska Emp Code hoga.</small>
-                </div>
+                <p className="text-xs font-medium text-orange-100">
+                  ADMIN
+                </p>
 
-                {addEmpMsg.text && (
-                  <div style={{
-                    padding: '10px',
-                    marginBottom: '15px',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    background: addEmpMsg.type === 'error' ? '#fde8e8' : '#def7ec',
-                    color: addEmpMsg.type === 'error' ? '#c53030' : '#03543f'
-                  }}>
-                    {addEmpMsg.text}
-                  </div>
+                <h2 className="mt-1 text-lg font-extrabold">
+                  Navigation
+                </h2>
+              </div>
+
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="rounded-lg bg-white/20 px-2 py-1 text-lg lg:hidden"
+              >
+                ×
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* Navigation */}
+          <div className="flex-1 overflow-y-auto p-3">
+
+            <div className="space-y-1">
+
+              <button
+                onClick={() =>
+                  changeTab('PROFILE', 'profile')
+                }
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === 'PROFILE' &&
+                  currentView === 'profile'
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                👤
+                <span>My Profile</span>
+              </button>
+
+              <button
+                onClick={() => changeTab('ADD EMPLOYEE')}
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === 'ADD EMPLOYEE'
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                ➕
+                <span>Add New Employee</span>
+              </button>
+
+              <button
+                onClick={() => changeTab('REQUISITIONS')}
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === 'REQUISITIONS'
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                📝
+                <span>Apply Requisition</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setFilter('ALL');
+                  changeTab('APPROVE REQUISITIONS');
+                }}
+                className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === 'APPROVE REQUISITIONS'
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  ✅
+                  Approve Requisitions
+                </span>
+
+                {pendingCount > 0 && (
+                  <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-bold text-white">
+                    {pendingCount}
+                  </span>
                 )}
 
-                <form onSubmit={handleAddEmployee} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', maxWidth: '650px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Emp Code (Unique ID):</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 3133"
-                      value={newEmpCode}
-                      onChange={(e) => setNewEmpCode(e.target.value)}
-                      required
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
-                    />
+              </button>
+
+              <button
+                onClick={() =>
+                  changeTab('PROFILE', 'change-password')
+                }
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === 'PROFILE' &&
+                  currentView === 'change-password'
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                🔐
+                <span>Change Password</span>
+              </button>
+
+              <button
+                onClick={() => changeTab('REPORTS')}
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === 'REPORTS'
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                📊
+                <span>Reports & Summary</span>
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* Sidebar Bottom */}
+          <div className="border-t border-slate-200 p-4">
+
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 sm:hidden"
+            >
+              🚪 Logout
+            </button>
+
+          </div>
+
+        </div>
+
+      </aside>
+
+      {/* ================================
+          MAIN CONTENT
+      ================================= */}
+      <main className="min-h-[calc(100vh-70px)] lg:ml-[280px]">
+
+        <div className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
+
+          {/* Mobile Page Navigation */}
+          <div className="mb-5 flex items-center justify-between lg:hidden">
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                Admin Dashboard
+              </p>
+
+              <h2 className="mt-1 text-xl font-extrabold text-slate-900">
+                {activeTab === 'PROFILE'
+                  ? currentView === 'change-password'
+                    ? 'Change Password'
+                    : 'My Profile'
+                  : activeTab}
+              </h2>
+            </div>
+
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-orange-200"
+            >
+              Menu
+            </button>
+
+          </div>
+
+          {/* MAIN CARD */}
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+            <div className="p-4 sm:p-6 lg:p-8">
+
+              {/* ============================
+                  ADD EMPLOYEE
+              ============================= */}
+              {activeTab === 'ADD EMPLOYEE' && (
+
+                <div>
+
+                  <div className="mb-6">
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                          Employee Management
+                        </p>
+
+                        <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                          Add New Employee
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Employee create hote hi default password Emp Code hoga.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
+                        👥 {safeEmployees.length} Employees
+                      </div>
+
+                    </div>
+
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Full Name:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Amit Sharma"
-                      value={newEmpName}
-                      onChange={(e) => setNewEmpName(e.target.value)}
-                      required
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Official Email:</label>
-                    <input
-                      type="email"
-                      placeholder="e.g. amit@company.com"
-                      value={newEmpEmail}
-                      onChange={(e) => setNewEmpEmail(e.target.value)}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Department:</label>
-                    <select
-                      value={newEmpDept}
-                      onChange={(e) => setNewEmpDept(e.target.value)}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  {addEmpMsg.text && (
+                    <div
+                      className={`mb-6 rounded-2xl border px-4 py-4 text-sm font-medium ${
+                        addEmpMsg.type === 'error'
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      }`}
                     >
-                      <option value="IT">IT</option>
-                      <option value="HR">HR</option>
-                      <option value="Sales">Sales</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Operations">Operations</option>
-                    </select>
+                      {addEmpMsg.text}
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={handleAddEmployee}
+                    className="grid grid-cols-1 gap-5 md:grid-cols-2"
+                  >
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Emp Code
+                      </label>
+
+                      <input
+                        type="text"
+                        placeholder="e.g. 3133"
+                        value={newEmpCode}
+                        onChange={(e) =>
+                          setNewEmpCode(e.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Full Name
+                      </label>
+
+                      <input
+                        type="text"
+                        placeholder="e.g. Amit Sharma"
+                        value={newEmpName}
+                        onChange={(e) =>
+                          setNewEmpName(e.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Official Email
+                      </label>
+
+                      <input
+                        type="email"
+                        placeholder="amit@company.com"
+                        value={newEmpEmail}
+                        onChange={(e) =>
+                          setNewEmpEmail(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Department
+                      </label>
+
+                      <select
+                        value={newEmpDept}
+                        onChange={(e) =>
+                          setNewEmpDept(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      >
+                        <option value="IT">IT</option>
+                        <option value="HR">HR</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Operations">Operations</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Designation
+                      </label>
+
+                      <input
+                        type="text"
+                        placeholder="Software Engineer"
+                        value={newEmpDesig}
+                        onChange={(e) =>
+                          setNewEmpDesig(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Gender
+                      </label>
+
+                      <select
+                        value={newEmpGender}
+                        onChange={(e) =>
+                          setNewEmpGender(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+
+                      <button
+                        type="submit"
+                        className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:shadow-xl sm:w-auto"
+                      >
+                        REGISTER EMPLOYEE
+                      </button>
+
+                    </div>
+
+                  </form>
+
+                  {/* DIRECTORY */}
+                  <div className="mt-10">
+
+                    <div className="mb-4">
+                      <h3 className="text-lg font-extrabold text-slate-900">
+                        Employee Directory
+                      </h3>
+
+                      <p className="text-sm text-slate-500">
+                        All registered employees
+                      </p>
+                    </div>
+
+                    {safeEmployees.length === 0 ? (
+
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                        <div className="text-3xl">👥</div>
+                        <p className="mt-2 text-sm font-semibold text-slate-500">
+                          No employees added yet.
+                        </p>
+                      </div>
+
+                    ) : (
+
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+
+                        <table className="min-w-[800px] w-full text-left text-sm">
+
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="px-4 py-4 font-bold text-slate-600">
+                                Emp Code
+                              </th>
+
+                              <th className="px-4 py-4 font-bold text-slate-600">
+                                Name
+                              </th>
+
+                              <th className="px-4 py-4 font-bold text-slate-600">
+                                Department
+                              </th>
+
+                              <th className="px-4 py-4 font-bold text-slate-600">
+                                Designation
+                              </th>
+
+                              <th className="px-4 py-4 font-bold text-slate-600">
+                                Email
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-slate-100">
+
+                            {safeEmployees.map((emp) => (
+
+                              <tr
+                                key={emp._id}
+                                className="transition hover:bg-orange-50/50"
+                              >
+
+                                <td className="px-4 py-4 font-bold text-orange-600">
+                                  {emp.empCode}
+                                </td>
+
+                                <td className="px-4 py-4 font-semibold text-slate-800">
+                                  {emp.name}
+                                </td>
+
+                                <td className="px-4 py-4 text-slate-600">
+                                  {emp.department}
+                                </td>
+
+                                <td className="px-4 py-4 text-slate-600">
+                                  {emp.designation}
+                                </td>
+
+                                <td className="px-4 py-4 text-slate-600">
+                                  {emp.email}
+                                </td>
+
+                              </tr>
+
+                            ))}
+
+                          </tbody>
+
+                        </table>
+
+                      </div>
+
+                    )}
+
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Designation:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Software Engineer"
-                      value={newEmpDesig}
-                      onChange={(e) => setNewEmpDesig(e.target.value)}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
-                    />
-                  </div>
+                </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Gender:</label>
-                    <select
-                      value={newEmpGender}
-                      onChange={(e) => setNewEmpGender(e.target.value)}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              )}
+
+              {/* ============================
+                  PROFILE
+              ============================= */}
+              {activeTab === 'PROFILE' &&
+                currentView === 'profile' && (
+
+                <div>
+
+                  <div className="mb-7 flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
+
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                        Account
+                      </p>
+
+                      <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                        My Profile
+                      </h2>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setCurrentView('change-password')
+                      }
+                      className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-600 transition hover:bg-orange-100"
                     >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
+                      🔐 Change Password
+                    </button>
+
                   </div>
 
-                  <div style={{ gridColumn: 'span 2', marginTop: '10px' }}>
+                  <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
+
+                    {/* PROFILE IMAGE */}
+                    <div className="flex flex-col items-center">
+
+                      <div className="h-48 w-40 overflow-hidden rounded-3xl border-4 border-white bg-slate-100 shadow-xl ring-1 ring-slate-200">
+
+                        {user?.picture ? (
+
+                          <img
+                            src={user.picture}
+                            alt="Profile"
+                            className="h-full w-full object-cover"
+                          />
+
+                        ) : (
+
+                          <div className="flex h-full flex-col items-center justify-center text-slate-400">
+
+                            <div className="text-6xl">
+                              👤
+                            </div>
+
+                            <span className="mt-2 text-xs font-semibold">
+                              No Image
+                            </span>
+
+                          </div>
+
+                        )}
+
+                      </div>
+
+                      <div className="mt-4 rounded-full bg-orange-50 px-4 py-2 text-xs font-bold text-orange-600">
+                        🛡️ Administrator
+                      </div>
+
+                    </div>
+
+                    {/* DETAILS */}
+                    <div>
+
+                      <div className="mb-6">
+                        <h3 className="text-xl font-extrabold text-slate-900">
+                          {user?.name || 'System Administrator'}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          {user?.designation || 'System Admin'}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+
+                        {[
+                          ['Emp Code', user?.empCode || 'ADMIN'],
+                          ['Employee Name', user?.name || 'System Administrator'],
+                          ['Role', 'Admin'],
+                          ['Department', user?.department || 'Management'],
+                          ['Designation', user?.designation || 'System Admin'],
+                          ['Cost Center', 'HQ'],
+                          ['Date of Joining', '01 Jan 2024'],
+                          ['Phone', user?.phone || 'Not Available']
+                        ].map(([label, value]) => (
+
+                          <div
+                            key={label}
+                            className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                          >
+
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                              {label}
+                            </p>
+
+                            <p
+                              className={`mt-1 text-sm font-bold ${
+                                label === 'Role'
+                                  ? 'text-orange-600'
+                                  : 'text-slate-800'
+                              }`}
+                            >
+                              {value}
+                            </p>
+
+                          </div>
+
+                        ))}
+
+                      </div>
+
+                      <div className="mt-6">
+
+                        <button
+                          onClick={() =>
+                            setIsEditModalOpen(true)
+                          }
+                          className="rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:shadow-xl"
+                        >
+                          ✏️ Edit Profile
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              )}
+
+              {/* ============================
+                  CHANGE PASSWORD
+              ============================= */}
+              {activeTab === 'PROFILE' &&
+                currentView === 'change-password' && (
+
+                <div className="max-w-xl">
+
+                  <div className="mb-7 flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
+
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                        Security
+                      </p>
+
+                      <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                        Change Password
+                      </h2>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setCurrentView('profile')
+                      }
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100"
+                    >
+                      ← Profile
+                    </button>
+
+                  </div>
+
+                  {pwdMsg.text && (
+                    <div
+                      className={`mb-6 rounded-2xl border p-4 text-sm font-semibold ${
+                        pwdMsg.type === 'error'
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {pwdMsg.text}
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={handleChangePassword}
+                    className="space-y-5"
+                  >
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Old Password
+                      </label>
+
+                      <input
+                        type="password"
+                        placeholder="Enter old password"
+                        value={oldPassword}
+                        onChange={(e) =>
+                          setOldPassword(e.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        New Password
+                      </label>
+
+                      <input
+                        type="password"
+                        placeholder="Enter new password"
+                        value={newPassword}
+                        onChange={(e) =>
+                          setNewPassword(e.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Confirm Password
+                      </label>
+
+                      <input
+                        type="password"
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={(e) =>
+                          setConfirmPassword(e.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
                     <button
                       type="submit"
-                      style={{
-                        background: 'linear-gradient(180deg, #ffc97a, #f39c12)',
-                        border: '1px solid #c97d10',
-                        padding: '9px 20px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        borderRadius: '4px'
-                      }}
+                      className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-3 font-extrabold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:shadow-xl"
                     >
-                      REGISTER EMPLOYEE
+                      UPDATE PASSWORD
                     </button>
-                  </div>
-                </form>
 
-                {/* Directory Table */}
-                <div style={{ marginTop: '35px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#1a365d' }}>
-                    Registered Employees Directory ({safeEmployees.length})
-                  </h4>
-                  {safeEmployees.length === 0 ? (
-                    <p style={{ fontSize: '12px', color: '#777' }}>No employees added yet.</p>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                      <thead>
-                        <tr style={{ background: '#fdf6ee', borderBottom: '2px solid #e0d7c7', textAlign: 'left' }}>
-                          <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Emp Code</th>
-                          <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Name</th>
-                          <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Department</th>
-                          <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Designation</th>
-                          <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Email</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {safeEmployees.map((emp) => (
-                          <tr key={emp._id}>
-                            <td style={{ padding: '8px', border: '1px solid #e0d7c7', fontWeight: 'bold' }}>{emp.empCode}</td>
-                            <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>{emp.name}</td>
-                            <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>{emp.department}</td>
-                            <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>{emp.designation}</td>
-                            <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>{emp.email}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                  </form>
+
                 </div>
-              </div>
-            )}
 
-            {/* TAB 2: PROFILE VIEW */}
-            {activeTab === 'PROFILE' && currentView === 'profile' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ margin: 0, color: '#c0392b', fontSize: '15px' }}>My Profile</h3>
-                  <button
-                    onClick={() => setCurrentView('change-password')}
-                    style={{
-                      background: 'linear-gradient(180deg, #ffc97a, #f39c12)',
-                      border: '1px solid #c97d10',
-                      padding: '5px 12px',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      borderRadius: '3px'
-                    }}
+              )}
+
+              {/* ============================
+                  REQUISITIONS
+              ============================= */}
+              {activeTab === 'REQUISITIONS' && (
+
+                <div className="max-w-2xl">
+
+                  <div className="mb-7">
+                    <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                      Leave Management
+                    </p>
+
+                    <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                      Apply Leave Requisition
+                    </h2>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Submit a new leave request.
+                    </p>
+                  </div>
+
+                  <form
+                    onSubmit={handleApplyLeave}
+                    className="space-y-5"
                   >
-                    CHANGE YOUR PASSWORD
-                  </button>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Leave Type
+                      </label>
+
+                      <select
+                        value={leaveType}
+                        onChange={(e) =>
+                          setLeaveType(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      >
+                        <option value="CL">
+                          CL - Casual Leave
+                        </option>
+
+                        <option value="EL">
+                          EL - Earned Leave
+                        </option>
+
+                        <option value="CO">
+                          CO - Compensatory Off
+                        </option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+
+                      <div>
+                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                          Start Date
+                        </label>
+
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) =>
+                            setStartDate(e.target.value)
+                          }
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                          End Date
+                        </label>
+
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) =>
+                            setEndDate(e.target.value)
+                          }
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                        />
+                      </div>
+
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        Reason
+                      </label>
+
+                      <textarea
+                        placeholder="Reason for leave..."
+                        value={reason}
+                        onChange={(e) =>
+                          setReason(e.target.value)
+                        }
+                        required
+                        rows="5"
+                        className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-3 font-extrabold text-white shadow-lg shadow-orange-200 transition hover:-translate-y-0.5 hover:shadow-xl sm:w-auto"
+                    >
+                      SUBMIT REQUISITION
+                    </button>
+
+                  </form>
+
                 </div>
 
-                <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: '130px',
-                    height: '150px',
-                    border: '1px solid #bbb',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    background: '#fafafa',
-                    overflow: 'hidden'
-                  }}>
-                    {user?.picture ? (
-                      <img src={user.picture} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <>
-                        <div style={{ width: '70px', height: '70px', borderRadius: '50%', border: '2px solid #b33939', position: 'relative', marginBottom: '10px' }}>
-                          <div style={{ position: 'absolute', width: '100%', height: '2px', background: '#b33939', top: '50%', transform: 'rotate(-45deg)' }}></div>
-                        </div>
-                        <span style={{ fontSize: '10px', color: '#555', fontWeight: 'bold' }}>Image Not Available</span>
-                      </>
-                    )}
-                  </div>
+              )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '130px 20px auto', rowGap: '12px', fontSize: '13px', color: '#222' }}>
-                    <span>Emp Code</span><span>:</span><strong>{user?.empCode || 'ADMIN'}</strong>
-                    <span>Emp Name</span><span>:</span><span>{user?.name || 'System Administrator'}</span>
-                    <span>Role</span><span>:</span><strong style={{ color: '#d35400' }}>Admin</strong>
-                    <span>Departments</span><span>:</span><span>{user?.department || 'Management'}</span>
-                    <span>Designation</span><span>:</span><span>{user?.designation || 'System Admin'}</span>
-                    <span>Cost Center</span><span>:</span><span>HQ</span>
-                    <span>Date of Joining</span><span>:</span><span>01 Jan 2024</span>
-                  </div>
-                </div>
+              {/* ============================
+                  APPROVE REQUISITIONS
+              ============================= */}
+              {activeTab === 'APPROVE REQUISITIONS' && (
 
-                <div style={{ marginTop: '30px', display: 'flex', gap: '15px' }}>
-                  <button
-                    onClick={() => setIsEditModalOpen(true)}
-                    style={{
-                      background: 'linear-gradient(180deg, #ffc97a, #f39c12)',
-                      border: '1px solid #c97d10',
-                      padding: '6px 14px',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      borderRadius: '3px'
-                    }}
-                  >
-                    EDIT YOUR PROFILE
-                  </button>
-                </div>
-              </div>
-            )}
+                <div>
 
-            {/* TAB 2: CHANGE PASSWORD */}
-            {activeTab === 'PROFILE' && currentView === 'change-password' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                  <h3 style={{ margin: 0, color: '#c0392b', fontSize: '15px' }}>Change Password</h3>
-                  <button
-                    onClick={() => setCurrentView('profile')}
-                    style={{ background: '#f1f5f9', border: '1px solid #ccc', padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '3px' }}
-                  >
-                    ← Back to Profile
-                  </button>
-                </div>
+                  <div className="mb-6 flex flex-col gap-5 border-b border-slate-100 pb-6 xl:flex-row xl:items-center xl:justify-between">
 
-                {pwdMsg.text && (
-                  <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '4px', fontSize: '13px', background: pwdMsg.type === 'error' ? '#fde8e8' : '#def7ec', color: pwdMsg.type === 'error' ? '#c53030' : '#03543f' }}>
-                    {pwdMsg.text}
-                  </div>
-                )}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                        Leave Requests
+                      </p>
 
-                <form onSubmit={handleChangePassword} style={{ maxWidth: '400px', display: 'grid', gap: '15px' }}>
-                  <input type="password" placeholder="Old Password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                  <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                  <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                  <button type="submit" style={{ background: '#f39c12', color: '#fff', border: 'none', padding: '8px 16px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}>UPDATE PASSWORD</button>
-                </form>
-              </div>
-            )}
+                      <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                        Approve / Reject Requisitions
+                      </h2>
+                    </div>
 
-            {/* TAB 3: REQUISITIONS VIEW */}
-            {activeTab === 'REQUISITIONS' && (
-              <div>
-                <h3 style={{ margin: '0 0 15px 0', color: '#c0392b', fontSize: '15px' }}>Apply Leave Requisition</h3>
-                <form onSubmit={handleApplyLeave} style={{ display: 'grid', gap: '15px', maxWidth: '500px' }}>
-                  <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}>
-                    <option value="CL">CL - Casual Leave</option>
-                    <option value="EL">EL - Earned Leave</option>
-                    <option value="CO">CO - Compensatory Off</option>
-                  </select>
-                  <div style={{ display: 'flex', gap: '15px' }}>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                  </div>
-                  <textarea placeholder="Reason for leave..." value={reason} onChange={(e) => setReason(e.target.value)} required rows="3" style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                  <button type="submit" style={{ background: '#f39c12', color: '#fff', border: 'none', padding: '8px 16px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', width: 'fit-content' }}>SUBMIT REQUISITION</button>
-                </form>
-              </div>
-            )}
+                    <div className="flex flex-wrap gap-2">
 
-            {/* TAB 4: APPROVE REQUISITIONS VIEW */}
-            {activeTab === 'APPROVE REQUISITIONS' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                  <h3 style={{ margin: 0, color: '#c0392b', fontSize: '15px' }}>Approve / Reject Leave Requisitions</h3>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {['ALL', 'Pending', 'Approved', 'Rejected'].map(s => (
-                      <button key={s} onClick={() => setFilter(s)} style={{ background: filter === s ? '#d35400' : '#f8f9fa', color: filter === s ? '#fff' : '#333', border: '1px solid #ccc', padding: '4px 8px', fontSize: '11px', cursor: 'pointer', borderRadius: '3px' }}>{s}</button>
-                    ))}
-                  </div>
-                </div>
+                      {[
+                        'ALL',
+                        'Pending',
+                        'Approved',
+                        'Rejected'
+                      ].map((status) => (
 
-                {filteredLeaves.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: '#777' }}>No requisitions matching this filter.</p>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                    <thead>
-                      <tr style={{ background: '#fdf6ee', borderBottom: '2px solid #e0d7c7', textAlign: 'left' }}>
-                        <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Employee Details</th>
-                        <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Type</th>
-                        <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Dates</th>
-                        <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Reason</th>
-                        <th style={{ padding: '8px', border: '1px solid #e0d7c7' }}>Status</th>
-                        <th style={{ padding: '8px', border: '1px solid #e0d7c7', textAlign: 'center' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLeaves.map((l) => (
-                        <tr key={l?._id || Math.random()}>
-                          <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>
-                            <strong>{l?.user?.name || 'Mr RAJ SANDEEP SINGH'}</strong><br />
-                            <span style={{ color: '#666', fontSize: '11px' }}>Code: {l?.user?.empCode || '3132'}</span>
-                          </td>
-                          <td style={{ padding: '8px', border: '1px solid #e0d7c7', fontWeight: 'bold' }}>{l?.leaveType || 'CL'}</td>
-                          <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>
-                            {l?.startDate ? new Date(l.startDate).toLocaleDateString() : ''} to {l?.endDate ? new Date(l.endDate).toLocaleDateString() : ''}
-                          </td>
-                          <td style={{ padding: '8px', border: '1px solid #e0d7c7' }}>{l?.reason || ''}</td>
-                          <td style={{ padding: '8px', border: '1px solid #e0d7c7', fontWeight: 'bold', color: l?.status === 'Approved' ? '#27ae60' : l?.status === 'Rejected' ? '#c0392b' : '#d35400' }}>
-                            {l?.status || 'Pending'}
-                          </td>
-                          <td style={{ padding: '8px', border: '1px solid #e0d7c7', textAlign: 'center' }}>
-                            {l?.status === 'Pending' ? (
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                <button onClick={() => handleUpdateStatus(l._id, 'Approved')} style={{ background: '#27ae60', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>Approve</button>
-                                <button onClick={() => handleUpdateStatus(l._id, 'Rejected')} style={{ background: '#c0392b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>Reject</button>
-                              </div>
-                            ) : (
-                              <span style={{ color: '#888', fontStyle: 'italic', fontSize: '11px' }}>Done</span>
-                            )}
-                          </td>
-                        </tr>
+                        <button
+                          key={status}
+                          onClick={() =>
+                            setFilter(status)
+                          }
+                          className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+                            filter === status
+                              ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {status}
+                        </button>
+
                       ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
 
-            {/* TAB 5: REPORTS VIEW */}
-            {activeTab === 'REPORTS' && (
-              <div>
-                <h3 style={{ margin: '0 0 15px 0', color: '#c0392b', fontSize: '15px' }}>Leave Reports</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
-                  <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>TOTAL</div>
-                    <div style={{ fontSize: '22px', fontWeight: 'bold', marginTop: '6px' }}>{safeLeaves.length}</div>
+                    </div>
+
                   </div>
-                  <div style={{ background: '#fffbeb', padding: '15px', borderRadius: '6px', border: '1px solid #fef3c7', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#d97706', fontWeight: 'bold' }}>PENDING</div>
-                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#b45309', marginTop: '6px' }}>{safeLeaves.filter(l => l?.status === 'Pending').length}</div>
-                  </div>
-                  <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '6px', border: '1px solid #dcfce7', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold' }}>APPROVED</div>
-                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#15803d', marginTop: '6px' }}>{safeLeaves.filter(l => l?.status === 'Approved').length}</div>
-                  </div>
-                  <div style={{ background: '#fef2f2', padding: '15px', borderRadius: '6px', border: '1px solid #fee2e2', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold' }}>REJECTED</div>
-                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#b91c1c', marginTop: '6px' }}>{safeLeaves.filter(l => l?.status === 'Rejected').length}</div>
-                  </div>
+
+                  {filteredLeaves.length === 0 ? (
+
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+
+                      <div className="text-4xl">
+                        📭
+                      </div>
+
+                      <p className="mt-3 font-semibold text-slate-500">
+                        No requisitions matching this filter.
+                      </p>
+
+                    </div>
+
+                  ) : (
+
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+
+                      <table className="min-w-[1000px] w-full text-left text-sm">
+
+                        <thead className="bg-slate-50">
+
+                          <tr>
+
+                            <th className="px-4 py-4 font-bold text-slate-600">
+                              Employee
+                            </th>
+
+                            <th className="px-4 py-4 font-bold text-slate-600">
+                              Type
+                            </th>
+
+                            <th className="px-4 py-4 font-bold text-slate-600">
+                              Dates
+                            </th>
+
+                            <th className="px-4 py-4 font-bold text-slate-600">
+                              Reason
+                            </th>
+
+                            <th className="px-4 py-4 font-bold text-slate-600">
+                              Status
+                            </th>
+
+                            <th className="px-4 py-4 text-center font-bold text-slate-600">
+                              Actions
+                            </th>
+
+                          </tr>
+
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100">
+
+                          {filteredLeaves.map((l) => (
+
+                            <tr
+                              key={l?._id}
+                              className="transition hover:bg-orange-50/40"
+                            >
+
+                              <td className="px-4 py-4">
+
+                                <p className="font-bold text-slate-800">
+                                  {l?.user?.name || 'Employee'}
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Code: {l?.user?.empCode || 'N/A'}
+                                </p>
+
+                              </td>
+
+                              <td className="px-4 py-4">
+                                <span className="rounded-lg bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600">
+                                  {l?.leaveType || 'CL'}
+                                </span>
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-4 text-slate-600">
+
+                                {l?.startDate
+                                  ? new Date(
+                                      l.startDate
+                                    ).toLocaleDateString()
+                                  : ''}
+
+                                {' → '}
+
+                                {l?.endDate
+                                  ? new Date(
+                                      l.endDate
+                                    ).toLocaleDateString()
+                                  : ''}
+
+                              </td>
+
+                              <td className="max-w-[250px] px-4 py-4 text-slate-600">
+                                {l?.reason || '—'}
+                              </td>
+
+                              <td className="px-4 py-4">
+
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                                    l?.status === 'Approved'
+                                      ? 'bg-emerald-50 text-emerald-600'
+                                      : l?.status === 'Rejected'
+                                      ? 'bg-red-50 text-red-600'
+                                      : 'bg-amber-50 text-amber-600'
+                                  }`}
+                                >
+                                  {l?.status || 'Pending'}
+                                </span>
+
+                              </td>
+
+                              <td className="px-4 py-4 text-center">
+
+                                {l?.status === 'Pending' ? (
+
+                                  <div className="flex justify-center gap-2">
+
+                                    <button
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          l._id,
+                                          'Approved'
+                                        )
+                                      }
+                                      className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600"
+                                    >
+                                      Approve
+                                    </button>
+
+                                    <button
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          l._id,
+                                          'Rejected'
+                                        )
+                                      }
+                                      className="rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-600"
+                                    >
+                                      Reject
+                                    </button>
+
+                                  </div>
+
+                                ) : (
+
+                                  <span className="text-xs font-medium italic text-slate-400">
+                                    Done
+                                  </span>
+
+                                )}
+
+                              </td>
+
+                            </tr>
+
+                          ))}
+
+                        </tbody>
+
+                      </table>
+
+                    </div>
+
+                  )}
+
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Edit Profile Modal */}
-      {isEditModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', padding: '25px', borderRadius: '6px', width: '380px' }}>
-            <h4 style={{ margin: '0 0 15px 0' }}>Update Profile</h4>
-            <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gap: '10px', fontSize: '13px' }}>
-              <div style={{ background: '#fdf6ee', padding: '8px', border: '1px dashed #f39c12', borderRadius: '4px' }}>
-                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px' }}>Upload Profile Picture:</label>
-                <input type="file" accept="image/*" onChange={handleImageChange} style={{ fontSize: '11px', width: '100%' }} />
-              </div>
-              <label>Department:
-                <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} style={{ width: '100%', padding: '6px' }} />
-              </label>
-              <label>Designation:
-                <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} style={{ width: '100%', padding: '6px' }} />
-              </label>
-              <label>Phone:
-                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', padding: '6px' }} />
-              </label>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" onClick={() => setIsEditModalOpen(false)} style={{ padding: '6px 12px' }}>Cancel</button>
-                <button type="submit" style={{ padding: '6px 12px', background: '#f39c12', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
-              </div>
-            </form>
-          </div>
+              )}
+
+              {/* ============================
+                  REPORTS
+              ============================= */}
+              {activeTab === 'REPORTS' && (
+
+                <div>
+
+                  <div className="mb-7">
+
+                    <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                      Analytics
+                    </p>
+
+                    <h2 className="mt-1 text-2xl font-extrabold text-slate-900">
+                      Leave Reports
+                    </h2>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Overview of all leave requisitions.
+                    </p>
+
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+
+                    {/* TOTAL */}
+                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+
+                      <div className="flex items-center justify-between">
+
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                            Total
+                          </p>
+
+                          <p className="mt-2 text-4xl font-black text-slate-900">
+                            {safeLeaves.length}
+                          </p>
+                        </div>
+
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl">
+                          📋
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* PENDING */}
+                    <div className="rounded-3xl border border-amber-100 bg-amber-50 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+
+                      <div className="flex items-center justify-between">
+
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-amber-600">
+                            Pending
+                          </p>
+
+                          <p className="mt-2 text-4xl font-black text-amber-700">
+                            {pendingCount}
+                          </p>
+                        </div>
+
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
+                          ⏳
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* APPROVED */}
+                    <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+
+                      <div className="flex items-center justify-between">
+
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+                            Approved
+                          </p>
+
+                          <p className="mt-2 text-4xl font-black text-emerald-700">
+                            {approvedCount}
+                          </p>
+                        </div>
+
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
+                          ✅
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* REJECTED */}
+                    <div className="rounded-3xl border border-red-100 bg-red-50 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+
+                      <div className="flex items-center justify-between">
+
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                            Rejected
+                          </p>
+
+                          <p className="mt-2 text-4xl font-black text-red-700">
+                            {rejectedCount}
+                          </p>
+                        </div>
+
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
+                          ❌
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </section>
+
         </div>
+
+      </main>
+
+      {/* ================================
+          EDIT PROFILE MODAL
+      ================================= */}
+      {isEditModalOpen && (
+
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
+
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-5 sm:px-7">
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                  Account
+                </p>
+
+                <h3 className="mt-1 text-xl font-extrabold text-slate-900">
+                  Update Profile
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setIsEditModalOpen(false)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg text-slate-600 transition hover:bg-slate-200"
+              >
+                ×
+              </button>
+
+            </div>
+
+            <form
+              onSubmit={handleUpdateProfile}
+              className="space-y-5 p-5 sm:p-7"
+            >
+
+              {/* Picture */}
+              <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50 p-4">
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+
+                  <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm">
+
+                    {picture ? (
+
+                      <img
+                        src={picture}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                      />
+
+                    ) : (
+
+                      <div className="flex h-full items-center justify-center text-3xl">
+                        👤
+                      </div>
+
+                    )}
+
+                  </div>
+
+                  <div className="min-w-0">
+
+                    <label className="mb-1 block text-sm font-bold text-slate-800">
+                      Profile Picture
+                    </label>
+
+                    <p className="mb-3 text-xs text-slate-500">
+                      Upload JPG, PNG or other image.
+                    </p>
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-500 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-orange-600"
+                    />
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Department */}
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700">
+                  Department
+                </label>
+
+                <input
+                  type="text"
+                  value={department}
+                  onChange={(e) =>
+                    setDepartment(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                />
+              </div>
+
+              {/* Designation */}
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700">
+                  Designation
+                </label>
+
+                <input
+                  type="text"
+                  value={designation}
+                  onChange={(e) =>
+                    setDesignation(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700">
+                  Phone
+                </label>
+
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) =>
+                    setPhone(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsEditModalOpen(false)
+                  }
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-orange-200 transition hover:shadow-xl"
+                >
+                  Save Changes
+                </button>
+
+              </div>
+
+            </form>
+
+          </div>
+
+        </div>
+
       )}
+
     </div>
   );
 };
