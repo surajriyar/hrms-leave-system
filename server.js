@@ -9,7 +9,7 @@ const app = express();
 
 // Middleware
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Google Client Setup
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '781582920391-n1g2a0eud2i0kqchlrbtqjou3ssgln4n.apps.googleusercontent.com';
