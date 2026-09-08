@@ -23,12 +23,11 @@ export default function AdminDashboard() {
   const [filter, setFilter] = useState("ALL");
 
   const [sidebarOpen, setSidebarOpen] = useState(
-    typeof window !== "undefined"
-      ? window.innerWidth >= 1024
-      : false
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : false
   );
 
   const [activeTab, setActiveTab] = useState("PROFILE");
+  const [currentView, setCurrentView] = useState("profile");
 
   // ================= ADD EMPLOYEE =================
 
@@ -38,9 +37,15 @@ export default function AdminDashboard() {
   const [newEmpDept, setNewEmpDept] = useState("IT");
   const [newEmpDesig, setNewEmpDesig] =
     useState("Software Engineer");
-  const [newEmpGender, setNewEmpGender] =
-    useState("Male");
+  const [newEmpGender, setNewEmpGender] = useState("Male");
   const [addEmpMsg, setAddEmpMsg] = useState("");
+
+  // ================= LEAVE FORM =================
+
+  const [leaveType, setLeaveType] = useState("CL");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [reason, setReason] = useState("");
 
   // ================= PASSWORD =================
 
@@ -55,7 +60,6 @@ export default function AdminDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] =
     useState(false);
 
-  const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
   const [designation, setDesignation] = useState("");
   const [phone, setPhone] = useState("");
@@ -74,17 +78,13 @@ export default function AdminDashboard() {
         };
       }
     } catch (error) {
-      console.error(
-        "Leave limits load error:",
-        error
-      );
+      console.error("Leave limits load error:", error);
     }
 
     return DEFAULT_LIMITS;
   });
 
-  const [leaveLimitMsg, setLeaveLimitMsg] =
-    useState("");
+  const [leaveLimitMsg, setLeaveLimitMsg] = useState("");
 
   // ================= LOAD USER =================
 
@@ -94,8 +94,7 @@ export default function AdminDashboard() {
         localStorage.getItem("user")
       );
 
-      const savedToken =
-        localStorage.getItem("token");
+      const savedToken = localStorage.getItem("token");
 
       if (!savedUser || !savedToken) {
         navigate("/");
@@ -110,7 +109,6 @@ export default function AdminDashboard() {
       setUser(savedUser);
       setToken(savedToken);
 
-      setName(savedUser.name || "");
       setDepartment(savedUser.department || "");
       setDesignation(savedUser.designation || "");
       setPhone(savedUser.phone || "");
@@ -119,19 +117,14 @@ export default function AdminDashboard() {
       fetchAllLeaves(savedToken);
       fetchAllEmployees(savedToken);
     } catch (error) {
-      console.error(
-        "Admin user load error:",
-        error
-      );
+      console.error(error);
       navigate("/");
     }
   }, [navigate]);
 
-  // ================= FETCH ALL LEAVES =================
+  // ================= FETCH LEAVES =================
 
-  const fetchAllLeaves = async (
-    authToken = token
-  ) => {
+  const fetchAllLeaves = async (authToken = token) => {
     try {
       const response = await fetch(
         `${API_URL}/api/leaves/all`,
@@ -143,22 +136,14 @@ export default function AdminDashboard() {
       );
 
       if (!response.ok) {
-        throw new Error(
-          "Failed to fetch leaves"
-        );
+        throw new Error("Failed to fetch leaves");
       }
 
       const data = await response.json();
 
-      setLeaves(
-        Array.isArray(data) ? data : []
-      );
+      setLeaves(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error(
-        "Leaves error:",
-        error
-      );
-
+      console.error("Leaves error:", error);
       setLeaves([]);
     }
   };
@@ -179,35 +164,28 @@ export default function AdminDashboard() {
       );
 
       if (!response.ok) {
-        throw new Error(
-          "Failed to fetch employees"
-        );
+        throw new Error("Failed to fetch employees");
       }
 
       const data = await response.json();
 
-      setEmployees(
-        Array.isArray(data) ? data : []
-      );
+      setEmployees(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error(
-        "Employees error:",
-        error
-      );
-
+      console.error("Employees error:", error);
       setEmployees([]);
     }
   };
 
   // ================= NAVIGATION =================
 
-  const changeTab = (tab) => {
+  const changeTab = (tab, view = null) => {
     setActiveTab(tab);
 
-    if (
-      typeof window !== "undefined" &&
-      window.innerWidth < 1024
-    ) {
+    if (view) {
+      setCurrentView(view);
+    }
+
+    if (window.innerWidth < 1024) {
       setSidebarOpen(false);
     }
   };
@@ -219,10 +197,7 @@ export default function AdminDashboard() {
 
     setAddEmpMsg("");
 
-    if (
-      !newEmpCode.trim() ||
-      !newEmpName.trim()
-    ) {
+    if (!newEmpCode.trim() || !newEmpName.trim()) {
       setAddEmpMsg(
         "Employee Code aur Name zaroori hain."
       );
@@ -234,12 +209,10 @@ export default function AdminDashboard() {
         `${API_URL}/api/admin/add-employee`,
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-
           body: JSON.stringify({
             empCode: newEmpCode.trim(),
             name: newEmpName.trim(),
@@ -255,8 +228,7 @@ export default function AdminDashboard() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Employee add nahi hua."
+          data.message || "Employee add nahi hua."
         );
       }
 
@@ -267,9 +239,6 @@ export default function AdminDashboard() {
       setNewEmpCode("");
       setNewEmpName("");
       setNewEmpEmail("");
-      setNewEmpDept("IT");
-      setNewEmpDesig("Software Engineer");
-      setNewEmpGender("Male");
 
       fetchAllEmployees(token);
     } catch (error) {
@@ -284,14 +253,6 @@ export default function AdminDashboard() {
 
     if (!file) return;
 
-    // 5MB limit
-    if (file.size > 5 * 1024 * 1024) {
-      alert(
-        "Image size 5MB se kam honi chahiye."
-      );
-      return;
-    }
-
     const reader = new FileReader();
 
     reader.onloadend = () => {
@@ -301,25 +262,35 @@ export default function AdminDashboard() {
     reader.readAsDataURL(file);
   };
 
-  // ================= UPDATE LEAVE STATUS =================
+  // ================= APPLY LEAVE =================
 
-  const handleUpdateStatus = async (
-    id,
-    status
-  ) => {
+  const handleApplyLeave = async (e) => {
+    e.preventDefault();
+
+    if (!startDate || !endDate || !reason.trim()) {
+      alert("Please fill all leave details.");
+      return;
+    }
+
+    if (new Date(endDate) < new Date(startDate)) {
+      alert("End date start date se pehle nahi ho sakti.");
+      return;
+    }
+
     try {
       const response = await fetch(
-        `${API_URL}/api/leaves/status/${id}`,
+        `${API_URL}/api/leaves/apply`,
         {
-          method: "PUT",
-
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-
           body: JSON.stringify({
-            status,
+            leaveType,
+            startDate,
+            endDate,
+            reason,
           }),
         }
       );
@@ -328,8 +299,43 @@ export default function AdminDashboard() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Status update failed."
+          data.message || "Leave apply nahi hui."
+        );
+      }
+
+      alert("Leave successfully apply ho gayi.");
+
+      setStartDate("");
+      setEndDate("");
+      setReason("");
+
+      fetchAllLeaves(token);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  // ================= UPDATE LEAVE STATUS =================
+
+  const handleUpdateStatus = async (id, status) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/leaves/status/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Status update failed."
         );
       }
 
@@ -351,23 +357,12 @@ export default function AdminDashboard() {
       !newPassword ||
       !confirmPassword
     ) {
-      setPwdMsg(
-        "All password fields are required."
-      );
+      setPwdMsg("All password fields are required.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPwdMsg(
-        "New password aur confirm password same nahi hain."
-      );
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setPwdMsg(
-        "New password kam se kam 6 characters ka hona chahiye."
-      );
+      setPwdMsg("New password aur confirm password same nahi hain.");
       return;
     }
 
@@ -376,12 +371,10 @@ export default function AdminDashboard() {
         `${API_URL}/api/auth/change-password`,
         {
           method: "PUT",
-
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-
           body: JSON.stringify({
             oldPassword,
             newPassword,
@@ -393,8 +386,7 @@ export default function AdminDashboard() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Password update failed."
+          data.message || "Password update failed."
         );
       }
 
@@ -413,24 +405,16 @@ export default function AdminDashboard() {
   // ================= UPDATE PROFILE =================
 
   const handleUpdateProfile = async () => {
-    if (!name.trim()) {
-      alert("Name cannot be empty.");
-      return;
-    }
-
     try {
       const response = await fetch(
         `${API_URL}/api/auth/profile`,
         {
           method: "PUT",
-
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-
           body: JSON.stringify({
-            name: name.trim(),
             department,
             phone,
             designation,
@@ -443,15 +427,13 @@ export default function AdminDashboard() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            "Profile update failed."
+          data.message || "Profile update failed."
         );
       }
 
       const updatedUser = {
         ...user,
         ...data.user,
-        name: data.user?.name || name.trim(),
       };
 
       localStorage.setItem(
@@ -460,22 +442,9 @@ export default function AdminDashboard() {
       );
 
       setUser(updatedUser);
-
-      setName(updatedUser.name || "");
-      setDepartment(
-        updatedUser.department || ""
-      );
-      setDesignation(
-        updatedUser.designation || ""
-      );
-      setPhone(updatedUser.phone || "");
-      setPicture(updatedUser.picture || "");
-
       setIsEditModalOpen(false);
 
-      alert(
-        "Profile updated successfully."
-      );
+      alert("Profile updated successfully.");
     } catch (error) {
       alert(error.message);
     }
@@ -487,34 +456,19 @@ export default function AdminDashboard() {
     const cleanedLimits = {
       CL: Math.max(
         0,
-        Number.parseInt(
-          leaveLimits.CL,
-          10
-        ) || 0
+        Number.parseInt(leaveLimits.CL, 10) || 0
       ),
-
       SL: Math.max(
         0,
-        Number.parseInt(
-          leaveLimits.SL,
-          10
-        ) || 0
+        Number.parseInt(leaveLimits.SL, 10) || 0
       ),
-
       EL: Math.max(
         0,
-        Number.parseInt(
-          leaveLimits.EL,
-          10
-        ) || 0
+        Number.parseInt(leaveLimits.EL, 10) || 0
       ),
-
       LWP: Math.max(
         0,
-        Number.parseInt(
-          leaveLimits.LWP,
-          10
-        ) || 0
+        Number.parseInt(leaveLimits.LWP, 10) || 0
       ),
     };
 
@@ -534,10 +488,7 @@ export default function AdminDashboard() {
     }, 3000);
   };
 
-  const handleLimitChange = (
-    type,
-    value
-  ) => {
+  const handleLimitChange = (type, value) => {
     setLeaveLimits((previous) => ({
       ...previous,
       [type]: value,
@@ -559,36 +510,28 @@ export default function AdminDashboard() {
     ? leaves
     : [];
 
-  const safeEmployees =
-    Array.isArray(employees)
-      ? employees
-      : [];
+  const safeEmployees = Array.isArray(employees)
+    ? employees
+    : [];
 
   const filteredLeaves =
     filter === "ALL"
       ? safeLeaves
       : safeLeaves.filter(
-          (leave) =>
-            leave.status === filter
+          (leave) => leave.status === filter
         );
 
-  const pendingCount =
-    safeLeaves.filter(
-      (leave) =>
-        leave.status === "Pending"
-    ).length;
+  const pendingCount = safeLeaves.filter(
+    (leave) => leave.status === "Pending"
+  ).length;
 
-  const approvedCount =
-    safeLeaves.filter(
-      (leave) =>
-        leave.status === "Approved"
-    ).length;
+  const approvedCount = safeLeaves.filter(
+    (leave) => leave.status === "Approved"
+  ).length;
 
-  const rejectedCount =
-    safeLeaves.filter(
-      (leave) =>
-        leave.status === "Rejected"
-    ).length;
+  const rejectedCount = safeLeaves.filter(
+    (leave) => leave.status === "Rejected"
+  ).length;
 
   // ================= SIDEBAR =================
 
@@ -597,59 +540,50 @@ export default function AdminDashboard() {
       id: "PROFILE",
       label: "Profile",
       icon: "👤",
+      view: "profile",
     },
-
     {
       id: "ADD EMPLOYEE",
       label: "Add Employee",
       icon: "➕",
+      view: "employees",
     },
-
     {
       id: "LEAVE LIMITS",
       label: "Leave Limits",
       icon: "⚙️",
+      view: "leave-limits",
     },
-
+    {
+      id: "REQUISITIONS",
+      label: "Requisitions",
+      icon: "📝",
+      view: "requisitions",
+    },
     {
       id: "APPROVE REQUISITIONS",
       label: "Approve Requisitions",
       icon: "✅",
+      view: "approve",
     },
-
     {
       id: "REPORTS",
       label: "Reports",
       icon: "📊",
+      view: "reports",
     },
   ];
 
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100">
-        <div className="rounded-2xl bg-white px-6 py-5 text-sm font-semibold shadow-sm">
-          Loading Admin Dashboard...
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
-
       {/* ================= TOP NAVBAR ================= */}
 
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-
           <div className="flex items-center gap-3">
-
             <button
               onClick={() =>
-                setSidebarOpen(
-                  !sidebarOpen
-                )
+                setSidebarOpen(!sidebarOpen)
               }
               className="rounded-xl bg-slate-100 px-3 py-2 text-xl transition hover:bg-slate-200 lg:hidden"
             >
@@ -665,22 +599,17 @@ export default function AdminDashboard() {
                 Admin Dashboard
               </p>
             </div>
-
           </div>
 
           <div className="flex items-center gap-3">
-
             <div className="hidden text-right sm:block">
-
-              <p className="max-w-[180px] truncate text-sm font-semibold">
-                {user?.name ||
-                  "Administrator"}
+              <p className="text-sm font-semibold">
+                {user?.name || "Administrator"}
               </p>
 
               <p className="text-xs text-slate-500">
                 Administrator
               </p>
-
             </div>
 
             <button
@@ -689,11 +618,8 @@ export default function AdminDashboard() {
             >
               Logout
             </button>
-
           </div>
-
         </div>
-
       </header>
 
       {/* ================= MOBILE OVERLAY ================= */}
@@ -701,9 +627,7 @@ export default function AdminDashboard() {
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-          onClick={() =>
-            setSidebarOpen(false)
-          }
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
@@ -711,10 +635,8 @@ export default function AdminDashboard() {
 
       <aside
         className={`
-          fixed left-0 top-16 z-40
-          h-[calc(100vh-4rem)]
-          w-72 border-r border-slate-200
-          bg-white
+          fixed left-0 top-16 z-40 h-[calc(100vh-4rem)]
+          w-72 border-r border-slate-200 bg-white
           transition-transform duration-300
           lg:translate-x-0
           ${
@@ -724,81 +646,57 @@ export default function AdminDashboard() {
           }
         `}
       >
-
         <div className="flex h-full flex-col">
-
           <div className="flex-1 overflow-y-auto p-4">
-
             <p className="mb-3 px-3 text-xs font-bold uppercase tracking-wider text-slate-400">
               Administration
             </p>
 
             <div className="space-y-1">
-
-              {sidebarItems.map(
-                (item) => (
-                  <button
-                    key={item.id}
-                    onClick={() =>
-                      changeTab(
-                        item.id
-                      )
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    changeTab(item.id, item.view)
+                  }
+                  className={`
+                    flex w-full items-center gap-3 rounded-xl
+                    px-4 py-3 text-left text-sm font-semibold
+                    transition
+                    ${
+                      activeTab === item.id
+                        ? "bg-slate-900 text-white shadow-sm"
+                        : "text-slate-600 hover:bg-slate-100"
                     }
-                    className={`
-                      flex w-full items-center
-                      gap-3 rounded-xl px-4 py-3
-                      text-left text-sm font-semibold
-                      transition
-                      ${
-                        activeTab ===
-                        item.id
-                          ? "bg-slate-900 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }
-                    `}
-                  >
+                  `}
+                >
+                  <span className="text-lg">
+                    {item.icon}
+                  </span>
 
-                    <span className="text-lg">
-                      {item.icon}
-                    </span>
-
-                    <span>
-                      {item.label}
-                    </span>
-
-                  </button>
-                )
-              )}
-
+                  <span>{item.label}</span>
+                </button>
+              ))}
             </div>
-
           </div>
 
           <div className="border-t border-slate-200 p-4">
-
             <div className="rounded-2xl bg-slate-50 p-4">
-
               <p className="text-xs text-slate-500">
                 Logged in as
               </p>
 
               <p className="mt-1 truncate text-sm font-bold">
-                {user?.email ||
-                  "Admin"}
+                {user?.email || "Admin"}
               </p>
-
             </div>
-
           </div>
-
         </div>
-
       </aside>
 
       {/* ================= MAIN ================= */}
 
       <main className="lg:ml-72">
-
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
           {/* ================================================= */}
@@ -807,7 +705,6 @@ export default function AdminDashboard() {
 
           {activeTab === "PROFILE" && (
             <div className="space-y-6">
-
               <div>
                 <h2 className="text-2xl font-bold">
                   Admin Profile
@@ -819,18 +716,12 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid gap-6 lg:grid-cols-3">
-
-                {/* PROFILE CARD */}
-
-                <div className="rounded-3xl bg-white p-6 shadow-sm">
-
+                <div className="rounded-3xl bg-white p-6 shadow-sm lg:col-span-1">
                   <div className="flex flex-col items-center text-center">
-
                     <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-slate-200">
-
-                      {user?.picture ? (
+                      {picture ? (
                         <img
-                          src={user.picture}
+                          src={picture}
                           alt="Profile"
                           className="h-full w-full object-cover"
                         />
@@ -839,64 +730,42 @@ export default function AdminDashboard() {
                           👤
                         </div>
                       )}
-
                     </div>
 
                     <h3 className="text-lg font-bold">
-                      {user?.name ||
-                        "Administrator"}
+                      {user?.name || "Administrator"}
                     </h3>
 
-                    <p className="break-all text-sm text-slate-500">
+                    <p className="text-sm text-slate-500">
                       {user?.email}
                     </p>
 
                     <button
                       onClick={() =>
-                        setIsEditModalOpen(
-                          true
-                        )
+                        setIsEditModalOpen(true)
                       }
-                      className="mt-5 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      className="mt-5 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
                     >
                       Edit Profile
                     </button>
-
                   </div>
-
                 </div>
 
-                {/* PROFILE INFORMATION */}
-
                 <div className="rounded-3xl bg-white p-6 shadow-sm lg:col-span-2">
-
                   <h3 className="text-lg font-bold">
                     Profile Information
                   </h3>
 
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
-
-                    <InfoBox
-                      label="Full Name"
-                      value={
-                        user?.name ||
-                        "Administrator"
-                      }
-                    />
-
                     <InfoBox
                       label="Employee Code"
-                      value={
-                        user?.empCode ||
-                        "ADMIN"
-                      }
+                      value={user?.empCode || "ADMIN"}
                     />
 
                     <InfoBox
                       label="Department"
                       value={
-                        user?.department ||
-                        "Management"
+                        user?.department || "Management"
                       }
                     />
 
@@ -910,87 +779,61 @@ export default function AdminDashboard() {
 
                     <InfoBox
                       label="Phone"
-                      value={
-                        user?.phone ||
-                        "Not added"
-                      }
+                      value={user?.phone || "Not added"}
                     />
-
-                    <InfoBox
-                      label="Role"
-                      value="Administrator"
-                    />
-
                   </div>
-
                 </div>
-
               </div>
 
               {/* CHANGE PASSWORD */}
 
               <div className="rounded-3xl bg-white p-6 shadow-sm">
-
                 <h3 className="text-lg font-bold">
                   Change Password
                 </h3>
 
                 <form
-                  onSubmit={
-                    handleChangePassword
-                  }
+                  onSubmit={handleChangePassword}
                   className="mt-5 grid gap-4 md:grid-cols-3"
                 >
-
                   <input
                     type="password"
                     placeholder="Old password"
-                    value={
-                      oldPassword
-                    }
+                    value={oldPassword}
                     onChange={(e) =>
-                      setOldPassword(
-                        e.target.value
-                      )
+                      setOldPassword(e.target.value)
                     }
-                    className="rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
+                    className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-500"
                   />
 
                   <input
                     type="password"
                     placeholder="New password"
-                    value={
-                      newPassword
-                    }
+                    value={newPassword}
                     onChange={(e) =>
-                      setNewPassword(
-                        e.target.value
-                      )
+                      setNewPassword(e.target.value)
                     }
-                    className="rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
+                    className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-500"
                   />
 
                   <input
                     type="password"
                     placeholder="Confirm password"
-                    value={
-                      confirmPassword
-                    }
+                    value={confirmPassword}
                     onChange={(e) =>
                       setConfirmPassword(
                         e.target.value
                       )
                     }
-                    className="rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
+                    className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-500"
                   />
 
                   <button
                     type="submit"
-                    className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 md:col-span-3"
+                    className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800 md:col-span-3"
                   >
                     Change Password
                   </button>
-
                 </form>
 
                 {pwdMsg && (
@@ -998,9 +841,7 @@ export default function AdminDashboard() {
                     {pwdMsg}
                   </p>
                 )}
-
               </div>
-
             </div>
           )}
 
@@ -1010,7 +851,6 @@ export default function AdminDashboard() {
 
           {activeTab === "ADD EMPLOYEE" && (
             <div className="space-y-6">
-
               <div>
                 <h2 className="text-2xl font-bold">
                   Add Employee
@@ -1022,55 +862,35 @@ export default function AdminDashboard() {
               </div>
 
               <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-7">
-
                 <form
-                  onSubmit={
-                    handleAddEmployee
-                  }
+                  onSubmit={handleAddEmployee}
                   className="grid gap-4 md:grid-cols-2"
                 >
-
                   <Input
                     label="Employee Code"
-                    value={
-                      newEmpCode
-                    }
-                    onChange={
-                      setNewEmpCode
-                    }
+                    value={newEmpCode}
+                    onChange={setNewEmpCode}
                     placeholder="EMP001"
                   />
 
                   <Input
                     label="Employee Name"
-                    value={
-                      newEmpName
-                    }
-                    onChange={
-                      setNewEmpName
-                    }
+                    value={newEmpName}
+                    onChange={setNewEmpName}
                     placeholder="Employee Name"
                   />
 
                   <Input
                     label="Email"
-                    value={
-                      newEmpEmail
-                    }
-                    onChange={
-                      setNewEmpEmail
-                    }
+                    value={newEmpEmail}
+                    onChange={setNewEmpEmail}
                     placeholder="employee@company.com"
                   />
 
                   <Select
                     label="Department"
-                    value={
-                      newEmpDept
-                    }
-                    onChange={
-                      setNewEmpDept
-                    }
+                    value={newEmpDept}
+                    onChange={setNewEmpDept}
                     options={[
                       "IT",
                       "HR",
@@ -1083,23 +903,15 @@ export default function AdminDashboard() {
 
                   <Input
                     label="Designation"
-                    value={
-                      newEmpDesig
-                    }
-                    onChange={
-                      setNewEmpDesig
-                    }
+                    value={newEmpDesig}
+                    onChange={setNewEmpDesig}
                     placeholder="Software Engineer"
                   />
 
                   <Select
                     label="Gender"
-                    value={
-                      newEmpGender
-                    }
-                    onChange={
-                      setNewEmpGender
-                    }
+                    value={newEmpGender}
+                    onChange={setNewEmpGender}
                     options={[
                       "Male",
                       "Female",
@@ -1109,11 +921,10 @@ export default function AdminDashboard() {
 
                   <button
                     type="submit"
-                    className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 md:col-span-2"
+                    className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800 md:col-span-2"
                   >
                     Add Employee
                   </button>
-
                 </form>
 
                 {addEmpMsg && (
@@ -1121,115 +932,66 @@ export default function AdminDashboard() {
                     {addEmpMsg}
                   </div>
                 )}
-
               </div>
 
               {/* EMPLOYEE DIRECTORY */}
 
               <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-7">
-
-                <div className="flex items-center justify-between gap-3">
-
-                  <div>
-                    <h3 className="text-lg font-bold">
-                      Employee Directory
-                    </h3>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      Total Employees:{" "}
-                      {safeEmployees.length}
-                    </p>
-                  </div>
-
-                </div>
+                <h3 className="text-lg font-bold">
+                  Employee Directory
+                </h3>
 
                 <div className="mt-5 overflow-x-auto">
-
                   <table className="min-w-full text-left text-sm">
-
                     <thead>
-
                       <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
-
                         <th className="px-4 py-3">
                           Employee
                         </th>
-
                         <th className="px-4 py-3">
                           Code
                         </th>
-
                         <th className="px-4 py-3">
                           Department
                         </th>
-
                         <th className="px-4 py-3">
                           Designation
                         </th>
-
                       </tr>
-
                     </thead>
 
                     <tbody>
+                      {safeEmployees.map((emp) => (
+                        <tr
+                          key={emp._id}
+                          className="border-b border-slate-100"
+                        >
+                          <td className="px-4 py-4">
+                            <p className="font-semibold">
+                              {emp.name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {emp.email}
+                            </p>
+                          </td>
 
-                      {safeEmployees.map(
-                        (emp) => (
-                          <tr
-                            key={
-                              emp._id
-                            }
-                            className="border-b border-slate-100"
-                          >
+                          <td className="px-4 py-4 font-medium">
+                            {emp.empCode}
+                          </td>
 
-                            <td className="px-4 py-4">
+                          <td className="px-4 py-4">
+                            {emp.department}
+                          </td>
 
-                              <p className="font-semibold">
-                                {emp.name ||
-                                  "Employee"}
-                              </p>
-
-                              <p className="break-all text-xs text-slate-500">
-                                {emp.email ||
-                                  ""}
-                              </p>
-
-                            </td>
-
-                            <td className="px-4 py-4 font-medium">
-                              {emp.empCode ||
-                                "-"}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              {emp.department ||
-                                "-"}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              {emp.designation ||
-                                "-"}
-                            </td>
-
-                          </tr>
-                        )
-                      )}
-
+                          <td className="px-4 py-4">
+                            {emp.designation}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
-
                   </table>
-
                 </div>
-
-                {safeEmployees.length ===
-                  0 && (
-                  <div className="py-8 text-center text-sm text-slate-500">
-                    No employees found.
-                  </div>
-                )}
-
               </div>
-
             </div>
           )}
 
@@ -1239,101 +1001,83 @@ export default function AdminDashboard() {
 
           {activeTab === "LEAVE LIMITS" && (
             <div className="space-y-6">
-
               <div>
                 <h2 className="text-2xl font-bold">
                   Leave Limits & Policy
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Set the maximum number of days an employee can take for each leave type.
+                  Set the maximum number of days an employee
+                  can take for each leave type.
                 </p>
               </div>
 
               <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-7">
-
                 <div className="mb-6 rounded-2xl bg-slate-50 p-4">
-
                   <p className="text-sm font-semibold">
                     Current Leave Policy
                   </p>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Leave limits currently browser storage mein save ho rahi hain. Backend enforcement ko next step mein connect karenge.
+                    Ye limits abhi local browser storage me
+                    save hongi. Backend enforcement next step
+                    me add karenge.
                   </p>
-
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* CL */}
 
                   <LeaveLimitCard
                     code="CL"
                     title="Casual Leave"
-                    value={
-                      leaveLimits.CL
-                    }
+                    value={leaveLimits.CL}
                     onChange={(value) =>
-                      handleLimitChange(
-                        "CL",
-                        value
-                      )
+                      handleLimitChange("CL", value)
                     }
                     description="Casual Leave"
                   />
 
+                  {/* SL */}
+
                   <LeaveLimitCard
                     code="SL"
                     title="Sick Leave"
-                    value={
-                      leaveLimits.SL
-                    }
+                    value={leaveLimits.SL}
                     onChange={(value) =>
-                      handleLimitChange(
-                        "SL",
-                        value
-                      )
+                      handleLimitChange("SL", value)
                     }
                     description="Sick Leave"
                   />
 
+                  {/* EL */}
+
                   <LeaveLimitCard
                     code="EL"
                     title="Earned Leave"
-                    value={
-                      leaveLimits.EL
-                    }
+                    value={leaveLimits.EL}
                     onChange={(value) =>
-                      handleLimitChange(
-                        "EL",
-                        value
-                      )
+                      handleLimitChange("EL", value)
                     }
                     description="Earned Leave"
                   />
 
+                  {/* LWP */}
+
                   <LeaveLimitCard
                     code="LWP"
                     title="Leave Without Pay"
-                    value={
-                      leaveLimits.LWP
-                    }
+                    value={leaveLimits.LWP}
                     onChange={(value) =>
-                      handleLimitChange(
-                        "LWP",
-                        value
-                      )
+                      handleLimitChange("LWP", value)
                     }
                     description="Leave Without Pay"
                   />
-
                 </div>
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-
                   <button
-                    onClick={
-                      handleSaveLeaveLimits
-                    }
+                    onClick={handleSaveLeaveLimits}
                     className="rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-slate-800"
                   >
                     Save Leave Limits
@@ -1341,55 +1085,145 @@ export default function AdminDashboard() {
 
                   {leaveLimitMsg && (
                     <p className="rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
-                      ✓{" "}
-                      {
-                        leaveLimitMsg
-                      }
+                      ✓ {leaveLimitMsg}
                     </p>
                   )}
-
                 </div>
-
               </div>
 
               {/* SUMMARY */}
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
                 <LimitSummary
                   code="CL"
                   title="Casual Leave"
-                  value={
-                    leaveLimits.CL
-                  }
+                  value={leaveLimits.CL}
                 />
 
                 <LimitSummary
                   code="SL"
                   title="Sick Leave"
-                  value={
-                    leaveLimits.SL
-                  }
+                  value={leaveLimits.SL}
                 />
 
                 <LimitSummary
                   code="EL"
                   title="Earned Leave"
-                  value={
-                    leaveLimits.EL
-                  }
+                  value={leaveLimits.EL}
                 />
 
                 <LimitSummary
                   code="LWP"
                   title="Leave Without Pay"
-                  value={
-                    leaveLimits.LWP
-                  }
+                  value={leaveLimits.LWP}
                 />
+              </div>
+            </div>
+          )}
 
+          {/* ================================================= */}
+          {/* REQUISITIONS */}
+          {/* ================================================= */}
+
+          {activeTab === "REQUISITIONS" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  Leave Requisition
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Apply leave from the admin account.
+                </p>
               </div>
 
+              <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-7">
+                <form
+                  onSubmit={handleApplyLeave}
+                  className="grid gap-5"
+                >
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Leave Type
+                    </label>
+
+                    <select
+                      value={leaveType}
+                      onChange={(e) =>
+                        setLeaveType(e.target.value)
+                      }
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
+                    >
+                      <option value="CL">
+                        Casual Leave
+                      </option>
+
+                      <option value="EL">
+                        Earned Leave
+                      </option>
+
+                      <option value="CO">
+                        Compensatory Off
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Start Date
+                      </label>
+
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) =>
+                          setStartDate(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold">
+                        End Date
+                      </label>
+
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) =>
+                          setEndDate(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Reason
+                    </label>
+
+                    <textarea
+                      value={reason}
+                      onChange={(e) =>
+                        setReason(e.target.value)
+                      }
+                      rows="4"
+                      placeholder="Enter leave reason..."
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800"
+                  >
+                    Apply Leave
+                  </button>
+                </form>
+              </div>
             </div>
           )}
 
@@ -1397,12 +1231,9 @@ export default function AdminDashboard() {
           {/* APPROVE REQUISITIONS */}
           {/* ================================================= */}
 
-          {activeTab ===
-            "APPROVE REQUISITIONS" && (
+          {activeTab === "APPROVE REQUISITIONS" && (
             <div className="space-y-6">
-
               <div>
-
                 <h2 className="text-2xl font-bold">
                   Approve Requisitions
                 </h2>
@@ -1410,64 +1241,20 @@ export default function AdminDashboard() {
                 <p className="mt-1 text-sm text-slate-500">
                   Review and manage employee leave requests.
                 </p>
-
-              </div>
-
-              {/* SUMMARY */}
-
-              <div className="grid gap-4 sm:grid-cols-3">
-
-                <ReportCard
-                  title="Pending"
-                  value={
-                    pendingCount
-                  }
-                  icon="⏳"
-                />
-
-                <ReportCard
-                  title="Approved"
-                  value={
-                    approvedCount
-                  }
-                  icon="✅"
-                />
-
-                <ReportCard
-                  title="Rejected"
-                  value={
-                    rejectedCount
-                  }
-                  icon="❌"
-                />
-
               </div>
 
               {/* FILTER */}
 
               <div className="flex flex-wrap gap-2">
-
-                {[
-                  "ALL",
-                  "Pending",
-                  "Approved",
-                  "Rejected",
-                ].map(
+                {["ALL", "Pending", "Approved", "Rejected"].map(
                   (item) => (
                     <button
                       key={item}
-                      onClick={() =>
-                        setFilter(
-                          item
-                        )
-                      }
+                      onClick={() => setFilter(item)}
                       className={`
-                        rounded-xl px-4 py-2
-                        text-sm font-semibold
-                        transition
+                        rounded-xl px-4 py-2 text-sm font-semibold
                         ${
-                          filter ===
-                          item
+                          filter === item
                             ? "bg-slate-900 text-white"
                             : "bg-white text-slate-600 hover:bg-slate-100"
                         }
@@ -1477,154 +1264,118 @@ export default function AdminDashboard() {
                     </button>
                   )
                 )}
-
               </div>
 
               {/* MOBILE CARDS */}
 
               <div className="space-y-4 lg:hidden">
-
-                {filteredLeaves.map(
-                  (leave) => (
-                    <div
-                      key={
-                        leave._id
-                      }
-                      className="rounded-2xl bg-white p-5 shadow-sm"
-                    >
-
-                      <div className="flex items-start justify-between gap-3">
-
-                        <div className="min-w-0">
-
-                          <p className="truncate font-bold">
-                            {leave.user
-                              ?.name ||
-                              leave.applicantName ||
-                              "Employee"}
-                          </p>
-
-                          <p className="truncate text-xs text-slate-500">
-                            {leave.user
-                              ?.email ||
-                              leave.applicantEmail ||
-                              ""}
-                          </p>
-
-                        </div>
-
-                        <StatusBadge
-                          status={
-                            leave.status
-                          }
-                        />
-
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-
-                        <div>
-
-                          <p className="text-xs text-slate-400">
-                            Type
-                          </p>
-
-                          <p className="font-semibold">
-                            {leave.leaveType ||
-                              "CL"}
-                          </p>
-
-                        </div>
-
-                        <div>
-
-                          <p className="text-xs text-slate-400">
-                            Dates
-                          </p>
-
-                          <p className="font-semibold">
-                            {formatDate(
-                              leave.startDate
-                            )}{" "}
-                            -{" "}
-                            {formatDate(
-                              leave.endDate
-                            )}
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      <div className="mt-4">
-
-                        <p className="text-xs text-slate-400">
-                          Reason
+                {filteredLeaves.map((leave) => (
+                  <div
+                    key={leave._id}
+                    className="rounded-2xl bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-bold">
+                          {leave.user?.name ||
+                            leave.applicantName ||
+                            "Employee"}
                         </p>
 
-                        <p className="mt-1 break-words text-sm">
-                          {leave.reason ||
-                            "No reason provided"}
+                        <p className="text-xs text-slate-500">
+                          {leave.user?.email ||
+                            leave.applicantEmail ||
+                            ""}
                         </p>
-
                       </div>
 
-                      {leave.status ===
-                        "Pending" && (
-                        <div className="mt-5 flex gap-2">
-
-                          <button
-                            onClick={() =>
-                              handleUpdateStatus(
-                                leave._id,
-                                "Approved"
-                              )
-                            }
-                            className="flex-1 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                          >
-                            Approve
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              handleUpdateStatus(
-                                leave._id,
-                                "Rejected"
-                              )
-                            }
-                            className="flex-1 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
-                          >
-                            Reject
-                          </button>
-
-                        </div>
-                      )}
-
+                      <StatusBadge
+                        status={leave.status}
+                      />
                     </div>
-                  )
-                )}
 
-                {filteredLeaves.length ===
-                  0 && (
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-slate-400">
+                          Type
+                        </p>
+
+                        <p className="font-semibold">
+                          {leave.leaveType || "CL"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-slate-400">
+                          Dates
+                        </p>
+
+                        <p className="font-semibold">
+                          {formatDate(
+                            leave.startDate
+                          )}{" "}
+                          -{" "}
+                          {formatDate(
+                            leave.endDate
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="text-xs text-slate-400">
+                        Reason
+                      </p>
+
+                      <p className="mt-1 text-sm">
+                        {leave.reason}
+                      </p>
+                    </div>
+
+                    {leave.status === "Pending" && (
+                      <div className="mt-5 flex gap-2">
+                        <button
+                          onClick={() =>
+                            handleUpdateStatus(
+                              leave._id,
+                              "Approved"
+                            )
+                          }
+                          className="flex-1 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                        >
+                          Approve
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleUpdateStatus(
+                              leave._id,
+                              "Rejected"
+                            )
+                          }
+                          className="flex-1 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {filteredLeaves.length === 0 && (
                   <div className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">
                     No leave requests found.
                   </div>
                 )}
-
               </div>
 
               {/* DESKTOP TABLE */}
 
               <div className="hidden overflow-hidden rounded-3xl bg-white shadow-sm lg:block">
-
                 <div className="overflow-x-auto">
-
                   <table className="min-w-full text-left text-sm">
-
                     <thead className="bg-slate-50">
-
                       <tr>
-
                         <th className="px-5 py-4">
                           Employee
                         </th>
@@ -1648,132 +1399,95 @@ export default function AdminDashboard() {
                         <th className="px-5 py-4">
                           Action
                         </th>
-
                       </tr>
-
                     </thead>
 
                     <tbody>
+                      {filteredLeaves.map((leave) => (
+                        <tr
+                          key={leave._id}
+                          className="border-t border-slate-100"
+                        >
+                          <td className="px-5 py-4">
+                            <p className="font-semibold">
+                              {leave.user?.name ||
+                                leave.applicantName ||
+                                "Employee"}
+                            </p>
 
-                      {filteredLeaves.map(
-                        (leave) => (
-                          <tr
-                            key={
-                              leave._id
-                            }
-                            className="border-t border-slate-100"
-                          >
+                            <p className="text-xs text-slate-500">
+                              {leave.user?.email ||
+                                leave.applicantEmail ||
+                                ""}
+                            </p>
+                          </td>
 
-                            <td className="px-5 py-4">
+                          <td className="px-5 py-4 font-semibold">
+                            {leave.leaveType || "CL"}
+                          </td>
 
-                              <p className="font-semibold">
-                                {leave.user
-                                  ?.name ||
-                                  leave.applicantName ||
-                                  "Employee"}
-                              </p>
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            {formatDate(
+                              leave.startDate
+                            )}{" "}
+                            -{" "}
+                            {formatDate(
+                              leave.endDate
+                            )}
+                          </td>
 
-                              <p className="text-xs text-slate-500">
-                                {leave.user
-                                  ?.email ||
-                                  leave.applicantEmail ||
-                                  ""}
-                              </p>
+                          <td className="max-w-xs px-5 py-4">
+                            <p className="truncate">
+                              {leave.reason}
+                            </p>
+                          </td>
 
-                            </td>
+                          <td className="px-5 py-4">
+                            <StatusBadge
+                              status={leave.status}
+                            />
+                          </td>
 
-                            <td className="px-5 py-4 font-semibold">
-                              {leave.leaveType ||
-                                "CL"}
-                            </td>
+                          <td className="px-5 py-4">
+                            {leave.status ===
+                            "Pending" ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() =>
+                                    handleUpdateStatus(
+                                      leave._id,
+                                      "Approved"
+                                    )
+                                  }
+                                  className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700"
+                                >
+                                  Approve
+                                </button>
 
-                            <td className="whitespace-nowrap px-5 py-4">
-                              {formatDate(
-                                leave.startDate
-                              )}{" "}
-                              -{" "}
-                              {formatDate(
-                                leave.endDate
-                              )}
-                            </td>
-
-                            <td className="max-w-xs px-5 py-4">
-
-                              <p className="truncate">
-                                {leave.reason ||
-                                  "No reason provided"}
-                              </p>
-
-                            </td>
-
-                            <td className="px-5 py-4">
-
-                              <StatusBadge
-                                status={
-                                  leave.status
-                                }
-                              />
-
-                            </td>
-
-                            <td className="px-5 py-4">
-
-                              {leave.status ===
-                              "Pending" ? (
-                                <div className="flex gap-2">
-
-                                  <button
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        leave._id,
-                                        "Approved"
-                                      )
-                                    }
-                                    className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700"
-                                  >
-                                    Approve
-                                  </button>
-
-                                  <button
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        leave._id,
-                                        "Rejected"
-                                      )
-                                    }
-                                    className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700"
-                                  >
-                                    Reject
-                                  </button>
-
-                                </div>
-                              ) : (
-                                <span className="text-xs text-slate-400">
-                                  No action
-                                </span>
-                              )}
-
-                            </td>
-
-                          </tr>
-                        )
-                      )}
-
+                                <button
+                                  onClick={() =>
+                                    handleUpdateStatus(
+                                      leave._id,
+                                      "Rejected"
+                                    )
+                                  }
+                                  className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">
+                                No action
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
-
                   </table>
-
                 </div>
-
-                {filteredLeaves.length ===
-                  0 && (
-                  <div className="p-10 text-center text-sm text-slate-500">
-                    No leave requests found.
-                  </div>
-                )}
-
               </div>
-
             </div>
           )}
 
@@ -1783,9 +1497,7 @@ export default function AdminDashboard() {
 
           {activeTab === "REPORTS" && (
             <div className="space-y-6">
-
               <div>
-
                 <h2 className="text-2xl font-bold">
                   Reports
                 </h2>
@@ -1793,141 +1505,77 @@ export default function AdminDashboard() {
                 <p className="mt-1 text-sm text-slate-500">
                   Leave management overview.
                 </p>
-
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
                 <ReportCard
                   title="Total Requests"
-                  value={
-                    safeLeaves.length
-                  }
+                  value={safeLeaves.length}
                   icon="📋"
                 />
 
                 <ReportCard
                   title="Pending"
-                  value={
-                    pendingCount
-                  }
+                  value={pendingCount}
                   icon="⏳"
                 />
 
                 <ReportCard
                   title="Approved"
-                  value={
-                    approvedCount
-                  }
+                  value={approvedCount}
                   icon="✅"
                 />
 
                 <ReportCard
                   title="Rejected"
-                  value={
-                    rejectedCount
-                  }
+                  value={rejectedCount}
                   icon="❌"
                 />
-
               </div>
 
-              {/* EMPLOYEE COUNT */}
-
               <div className="rounded-3xl bg-white p-6 shadow-sm">
-
-                <h3 className="text-lg font-bold">
-                  Employee Overview
-                </h3>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-
-                  <InfoBox
-                    label="Total Employees"
-                    value={
-                      safeEmployees.length
-                    }
-                  />
-
-                  <InfoBox
-                    label="Pending Requests"
-                    value={
-                      pendingCount
-                    }
-                  />
-
-                </div>
-
-              </div>
-
-              {/* LEAVE LIMITS */}
-
-              <div className="rounded-3xl bg-white p-6 shadow-sm">
-
                 <h3 className="text-lg font-bold">
                   Leave Limits
                 </h3>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
                   <LimitSummary
                     code="CL"
                     title="Casual Leave"
-                    value={
-                      leaveLimits.CL
-                    }
+                    value={leaveLimits.CL}
                   />
 
                   <LimitSummary
                     code="SL"
                     title="Sick Leave"
-                    value={
-                      leaveLimits.SL
-                    }
+                    value={leaveLimits.SL}
                   />
 
                   <LimitSummary
                     code="EL"
                     title="Earned Leave"
-                    value={
-                      leaveLimits.EL
-                    }
+                    value={leaveLimits.EL}
                   />
 
                   <LimitSummary
                     code="LWP"
                     title="Leave Without Pay"
-                    value={
-                      leaveLimits.LWP
-                    }
+                    value={leaveLimits.LWP}
                   />
-
                 </div>
-
               </div>
-
             </div>
           )}
-
         </div>
-
       </main>
 
-      {/* ================================================= */}
-      {/* EDIT PROFILE MODAL */}
-      {/* ================================================= */}
+      {/* ================= EDIT PROFILE MODAL ================= */}
 
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-
-            {/* HEADER */}
-
             <div className="flex items-center justify-between">
-
               <div>
-
                 <h2 className="text-xl font-bold">
                   Edit Profile
                 </h2>
@@ -1935,50 +1583,20 @@ export default function AdminDashboard() {
                 <p className="text-sm text-slate-500">
                   Update your information.
                 </p>
-
               </div>
 
               <button
                 onClick={() =>
-                  setIsEditModalOpen(
-                    false
-                  )
+                  setIsEditModalOpen(false)
                 }
-                className="rounded-xl bg-slate-100 px-3 py-2 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 px-3 py-2"
               >
                 ✕
               </button>
-
             </div>
 
             <div className="mt-6 space-y-4">
-
-              {/* NAME */}
-
               <div>
-
-                <label className="mb-2 block text-sm font-semibold">
-                  Full Name
-                </label>
-
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) =>
-                    setName(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter your full name"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                />
-
-              </div>
-
-              {/* PROFILE PICTURE */}
-
-              <div>
-
                 <label className="mb-2 block text-sm font-semibold">
                   Profile Picture
                 </label>
@@ -1986,98 +1604,63 @@ export default function AdminDashboard() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={
-                    handleImageChange
-                  }
+                  onChange={handleImageChange}
                   className="w-full rounded-xl border border-slate-200 p-3 text-sm"
                 />
-
               </div>
 
-              {/* DEPARTMENT */}
-
               <div>
-
                 <label className="mb-2 block text-sm font-semibold">
                   Department
                 </label>
 
                 <input
-                  value={
-                    department
-                  }
+                  value={department}
                   onChange={(e) =>
-                    setDepartment(
-                      e.target.value
-                    )
+                    setDepartment(e.target.value)
                   }
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
                 />
-
               </div>
 
-              {/* DESIGNATION */}
-
               <div>
-
                 <label className="mb-2 block text-sm font-semibold">
                   Designation
                 </label>
 
                 <input
-                  value={
-                    designation
-                  }
+                  value={designation}
                   onChange={(e) =>
-                    setDesignation(
-                      e.target.value
-                    )
+                    setDesignation(e.target.value)
                   }
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
                 />
-
               </div>
 
-              {/* PHONE */}
-
               <div>
-
                 <label className="mb-2 block text-sm font-semibold">
                   Phone
                 </label>
 
                 <input
-                  type="tel"
                   value={phone}
                   onChange={(e) =>
-                    setPhone(
-                      e.target.value
-                    )
+                    setPhone(e.target.value)
                   }
-                  placeholder="Enter phone number"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none"
                 />
-
               </div>
 
-              {/* SAVE */}
-
               <button
-                onClick={
-                  handleUpdateProfile
-                }
-                className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
+                onClick={handleUpdateProfile}
+                className="w-full rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-800"
               >
                 Save Profile
               </button>
-
             </div>
-
           </div>
-
         </div>
       )}
-
     </div>
   );
 }
@@ -2094,7 +1677,6 @@ function Input({
 }) {
   return (
     <div>
-
       <label className="mb-2 block text-sm font-semibold">
         {label}
       </label>
@@ -2102,14 +1684,11 @@ function Input({
       <input
         value={value}
         onChange={(e) =>
-          onChange(
-            e.target.value
-          )
+          onChange(e.target.value)
         }
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500"
       />
-
     </div>
   );
 }
@@ -2122,7 +1701,6 @@ function Select({
 }) {
   return (
     <div>
-
       <label className="mb-2 block text-sm font-semibold">
         {label}
       </label>
@@ -2130,37 +1708,23 @@ function Select({
       <select
         value={value}
         onChange={(e) =>
-          onChange(
-            e.target.value
-          )
+          onChange(e.target.value)
         }
-        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-500"
       >
-
-        {options.map(
-          (option) => (
-            <option
-              key={option}
-              value={option}
-            >
-              {option}
-            </option>
-          )
-        )}
-
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
       </select>
-
     </div>
   );
 }
 
-function InfoBox({
-  label,
-  value,
-}) {
+function InfoBox({ label, value }) {
   return (
     <div className="rounded-2xl bg-slate-50 p-4">
-
       <p className="text-xs font-medium text-slate-400">
         {label}
       </p>
@@ -2168,7 +1732,6 @@ function InfoBox({
       <p className="mt-1 break-words text-sm font-bold">
         {value}
       </p>
-
     </div>
   );
 }
@@ -2182,9 +1745,7 @@ function LeaveLimitCard({
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-
       <div className="flex items-center justify-between">
-
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 font-bold text-white">
           {code}
         </div>
@@ -2192,7 +1753,6 @@ function LeaveLimitCard({
         <span className="text-xs font-medium text-slate-400">
           Days / Year
         </span>
-
       </div>
 
       <h3 className="mt-4 font-bold">
@@ -2208,13 +1768,10 @@ function LeaveLimitCard({
         min="0"
         value={value}
         onChange={(e) =>
-          onChange(
-            e.target.value
-          )
+          onChange(e.target.value)
         }
-        className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-lg font-bold outline-none transition focus:border-slate-500"
+        className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-lg font-bold outline-none focus:border-slate-500"
       />
-
     </div>
   );
 }
@@ -2226,9 +1783,7 @@ function LimitSummary({
 }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
-
       <div className="flex items-center justify-between">
-
         <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold">
           {code}
         </span>
@@ -2236,7 +1791,6 @@ function LimitSummary({
         <span className="text-2xl font-bold">
           {value}
         </span>
-
       </div>
 
       <p className="mt-3 text-sm font-semibold">
@@ -2246,7 +1800,6 @@ function LimitSummary({
       <p className="mt-1 text-xs text-slate-500">
         Maximum days per year
       </p>
-
     </div>
   );
 }
@@ -2258,37 +1811,27 @@ function ReportCard({
 }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
-
       <div className="flex items-center justify-between">
-
-        <span className="text-2xl">
-          {icon}
-        </span>
+        <span className="text-2xl">{icon}</span>
 
         <span className="text-3xl font-bold">
           {value}
         </span>
-
       </div>
 
       <p className="mt-3 text-sm font-semibold text-slate-600">
         {title}
       </p>
-
     </div>
   );
 }
 
-function StatusBadge({
-  status,
-}) {
+function StatusBadge({ status }) {
   const classes = {
     Pending:
       "bg-amber-50 text-amber-700",
-
     Approved:
       "bg-green-50 text-green-700",
-
     Rejected:
       "bg-red-50 text-red-700",
   };
@@ -2300,7 +1843,7 @@ function StatusBadge({
         "bg-slate-100 text-slate-600"
       }`}
     >
-      {status || "Unknown"}
+      {status}
     </span>
   );
 }
@@ -2310,20 +1853,13 @@ function formatDate(date) {
 
   const d = new Date(date);
 
-  if (
-    Number.isNaN(
-      d.getTime()
-    )
-  ) {
+  if (Number.isNaN(d.getTime())) {
     return "-";
   }
 
-  return d.toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }

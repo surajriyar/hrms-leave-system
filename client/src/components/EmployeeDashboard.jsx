@@ -1,8 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const DEFAULT_BALANCE = {
+  CL: { allowed: 7, used: 0, remaining: 7 },
+  SL: { allowed: 7, used: 0, remaining: 7 },
+  EL: { allowed: 7, used: 0, remaining: 7 },
+  LWP: { allowed: 7, used: 0, remaining: 7 },
+  CO: { allowed: 7, used: 0, remaining: 7 },
+};
+
+const LEAVE_NAMES = {
+  CL: "Casual Leave",
+  SL: "Sick Leave",
+  EL: "Earned Leave",
+  LWP: "Leave Without Pay",
+  CO: "Comp Off",
+};
 
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
@@ -17,33 +33,79 @@ export default function EmployeeDashboard() {
 
   const [leaves, setLeaves] = useState([]);
 
+  /* ================= LEAVE FORM ================= */
+
   const [leaveType, setLeaveType] = useState("CL");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
 
+  /* ================= LEAVE BALANCE ================= */
+
+  const [leaveBalance, setLeaveBalance] =
+    useState(DEFAULT_BALANCE);
+
+  const [balanceYear, setBalanceYear] = useState(
+    new Date().getFullYear()
+  );
+
+  const [balanceLoading, setBalanceLoading] =
+    useState(true);
+
+  /* ================= PASSWORD ================= */
+
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
+
   const [pwdMsg, setPwdMsg] = useState("");
+
+  /* ================= PROFILE ================= */
 
   const [editOpen, setEditOpen] = useState(false);
 
-  const [department, setDepartment] = useState(user.department || "");
-  const [phone, setPhone] = useState(user.phone || "");
-  const [designation, setDesignation] = useState(user.designation || "");
-  const [costCenter, setCostCenter] = useState(user.costCenter || "");
-  const [dob, setDob] = useState(user.dob || "");
-  const [picture, setPicture] = useState(user.picture || "");
+  const [name, setName] = useState(
+    user.name || user.employeeName || ""
+  );
+
+  const [department, setDepartment] = useState(
+    user.department || ""
+  );
+
+  const [phone, setPhone] = useState(
+    user.phone || ""
+  );
+
+  const [designation, setDesignation] = useState(
+    user.designation || ""
+  );
+
+  const [costCenter, setCostCenter] = useState(
+    user.costCenter || ""
+  );
+
+  const [dob, setDob] = useState(
+    user.dob || ""
+  );
+
+  const [picture, setPicture] = useState(
+    user.picture || ""
+  );
 
   const token = localStorage.getItem("token");
 
-  const today = new Date().toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const today = new Date().toLocaleDateString(
+    "en-IN",
+    {
+      weekday: "long",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }
+  );
+
+  /* ================= LOAD DATA ================= */
 
   useEffect(() => {
     if (!token) {
@@ -52,184 +114,514 @@ export default function EmployeeDashboard() {
     }
 
     fetchMyLeaves();
+    fetchLeaveBalance();
   }, [token]);
+
+  /* ================= FETCH MY LEAVES ================= */
 
   const fetchMyLeaves = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/leaves/my`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${API_URL}/api/leaves/my`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await response.json();
 
-      if (Array.isArray(data)) {
+      if (response.ok && Array.isArray(data)) {
         setLeaves(data);
       }
     } catch (error) {
-      console.error("Failed to fetch leaves:", error);
+      console.error(
+        "Failed to fetch leaves:",
+        error
+      );
     }
   };
+
+  /* ================= FETCH LEAVE BALANCE ================= */
+
+  const fetchLeaveBalance = async () => {
+    setBalanceLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/leaves/balance`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.balance) {
+        setBalanceYear(
+          data.year ||
+            new Date().getFullYear()
+        );
+
+        setLeaveBalance({
+          CL: {
+            ...DEFAULT_BALANCE.CL,
+            ...(data.balance.CL || {}),
+          },
+
+          SL: {
+            ...DEFAULT_BALANCE.SL,
+            ...(data.balance.SL || {}),
+          },
+
+          EL: {
+            ...DEFAULT_BALANCE.EL,
+            ...(data.balance.EL || {}),
+          },
+
+          LWP: {
+            ...DEFAULT_BALANCE.LWP,
+            ...(data.balance.LWP || {}),
+          },
+
+          CO: {
+            ...DEFAULT_BALANCE.CO,
+            ...(data.balance.CO || {}),
+          },
+        });
+      } else {
+        calculateBalanceFromLeaves();
+      }
+    } catch (error) {
+      console.error(
+        "Failed to fetch leave balance:",
+        error
+      );
+
+      calculateBalanceFromLeaves();
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  /* ================= FALLBACK BALANCE ================= */
+
+  const calculateBalanceFromLeaves = () => {
+    const balance = {
+      CL: { ...DEFAULT_BALANCE.CL },
+      SL: { ...DEFAULT_BALANCE.SL },
+      EL: { ...DEFAULT_BALANCE.EL },
+      LWP: { ...DEFAULT_BALANCE.LWP },
+      CO: { ...DEFAULT_BALANCE.CO },
+    };
+
+    const currentYear =
+      new Date().getFullYear();
+
+    leaves.forEach((leave) => {
+      if (
+        !leave.startDate ||
+        !leave.endDate
+      ) {
+        return;
+      }
+
+      const leaveYear =
+        new Date(
+          leave.startDate
+        ).getFullYear();
+
+      if (leaveYear !== currentYear) {
+        return;
+      }
+
+      const type =
+        leave.leaveType;
+
+      if (!balance[type]) {
+        return;
+      }
+
+      const status = String(
+        leave.status || ""
+      ).toLowerCase();
+
+      // Rejected leaves do not count
+      if (status.includes("reject")) {
+        return;
+      }
+
+      const start = new Date(
+        leave.startDate
+      );
+
+      const end = new Date(
+        leave.endDate
+      );
+
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
+      const days =
+        Math.floor(
+          (end.getTime() -
+            start.getTime()) /
+            (1000 * 60 * 60 * 24)
+        ) + 1;
+
+      if (days > 0) {
+        balance[type].used += days;
+      }
+    });
+
+    Object.keys(balance).forEach(
+      (type) => {
+        balance[type].remaining =
+          Math.max(
+            balance[type].allowed -
+              balance[type].used,
+            0
+          );
+      }
+    );
+
+    setLeaveBalance(balance);
+  };
+
+  /* ================= DATE CALCULATION ================= */
+
+  const requestedDays = useMemo(() => {
+    if (!startDate || !endDate) {
+      return 0;
+    }
+
+    const start =
+      new Date(startDate);
+
+    const end =
+      new Date(endDate);
+
+    if (
+      isNaN(start.getTime()) ||
+      isNaN(end.getTime()) ||
+      end < start
+    ) {
+      return 0;
+    }
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    return (
+      Math.floor(
+        (end.getTime() -
+          start.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1
+    );
+  }, [startDate, endDate]);
+
+  const selectedBalance =
+    leaveBalance[leaveType] ||
+    DEFAULT_BALANCE[leaveType];
+
+  const canApplySelectedLeave =
+    requestedDays > 0 &&
+    requestedDays <=
+      selectedBalance.remaining;
+
+  /* ================= LOGOUT ================= */
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
     navigate("/");
   };
 
+  /* ================= IMAGE UPLOAD ================= */
+
   const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
+    const file =
+      e.target.files?.[0];
 
     if (!file) return;
 
-    const reader = new FileReader();
+    const reader =
+      new FileReader();
 
     reader.onloadend = () => {
-      setPicture(reader.result);
+      setPicture(
+        reader.result
+      );
     };
 
     reader.readAsDataURL(file);
   };
 
-  const handleUpdateProfile = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/auth/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+  /* ================= UPDATE PROFILE ================= */
+
+  const handleUpdateProfile =
+    async () => {
+      try {
+        if (!name.trim()) {
+          alert(
+            "Name cannot be empty."
+          );
+          return;
+        }
+
+        const response =
+          await fetch(
+            `${API_URL}/api/auth/profile`,
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Authorization: `Bearer ${token}`,
+              },
+
+              body: JSON.stringify({
+                name: name.trim(),
+                department,
+                phone,
+                dob,
+                designation,
+                costCenter,
+                picture,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          alert(
+            data.message ||
+              "Failed to update profile"
+          );
+
+          return;
+        }
+
+        const updatedUser = {
+          ...user,
+          ...data.user,
+
+          name: name.trim(),
           department,
           phone,
           dob,
           designation,
           costCenter,
           picture,
-        }),
-      });
+        };
 
-      const data = await response.json();
+        setUser(updatedUser);
 
-      if (!response.ok) {
-        alert(data.message || "Failed to update profile");
+        localStorage.setItem(
+          "user",
+          JSON.stringify(
+            updatedUser
+          )
+        );
+
+        setEditOpen(false);
+
+        alert(
+          "Profile updated successfully!"
+        );
+      } catch (error) {
+        console.error(
+          "Profile update error:",
+          error
+        );
+
+        alert(
+          "Something went wrong."
+        );
+      }
+    };
+
+  /* ================= APPLY LEAVE ================= */
+
+  const handleApplyLeave =
+    async (e) => {
+      e.preventDefault();
+
+      if (
+        !startDate ||
+        !endDate ||
+        !reason
+      ) {
+        alert(
+          "Please fill all leave details."
+        );
+
         return;
       }
 
-      const updatedUser = {
-        ...user,
-        ...data.user,
-        department,
-        phone,
-        dob,
-        designation,
-        costCenter,
-        picture,
-      };
+      if (requestedDays <= 0) {
+        alert(
+          "End date cannot be before start date."
+        );
 
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-
-      setEditOpen(false);
-      alert("Profile updated successfully!");
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong.");
-    }
-  };
-
-  const handleApplyLeave = async (e) => {
-    e.preventDefault();
-
-    if (!startDate || !endDate || !reason) {
-      alert("Please fill all leave details.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_URL}/api/leaves/apply`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          leaveType,
-          startDate,
-          endDate,
-          reason,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || "Failed to apply leave");
         return;
       }
 
-      alert("Leave application submitted successfully!");
+      if (
+        requestedDays >
+        selectedBalance.remaining
+      ) {
+        alert(
+          `${LEAVE_NAMES[leaveType]} balance is not enough.\n\nAvailable: ${selectedBalance.remaining} day(s)\nRequested: ${requestedDays} day(s)`
+        );
 
-      setStartDate("");
-      setEndDate("");
-      setReason("");
+        return;
+      }
 
-      fetchMyLeaves();
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong.");
-    }
-  };
+      try {
+        const response =
+          await fetch(
+            `${API_URL}/api/leaves/apply`,
+            {
+              method: "POST",
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
+              headers: {
+                "Content-Type":
+                  "application/json",
 
-    setPwdMsg("");
+                Authorization: `Bearer ${token}`,
+              },
 
-    if (newPassword !== confirmPassword) {
-      setPwdMsg("New password and confirm password do not match.");
-      return;
-    }
+              body: JSON.stringify({
+                leaveType,
+                startDate,
+                endDate,
+                reason,
+              }),
+            }
+          );
 
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setPwdMsg("Please fill all password fields.");
-      return;
-    }
+        const data =
+          await response.json();
 
-    try {
-      const response = await fetch(
-        `${API_URL}/api/auth/change-password`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            oldPassword,
-            newPassword,
-          }),
+        if (!response.ok) {
+          alert(
+            data.message ||
+              "Failed to apply leave"
+          );
+
+          return;
         }
-      );
 
-      const data = await response.json();
+        alert(
+          "Leave application submitted successfully!"
+        );
 
-      if (!response.ok) {
-        setPwdMsg(data.message || "Failed to change password");
+        setStartDate("");
+        setEndDate("");
+        setReason("");
+
+        await fetchMyLeaves();
+        await fetchLeaveBalance();
+      } catch (error) {
+        console.error(error);
+
+        alert(
+          "Something went wrong."
+        );
+      }
+    };
+
+  /* ================= CHANGE PASSWORD ================= */
+
+  const handleChangePassword =
+    async (e) => {
+      e.preventDefault();
+
+      setPwdMsg("");
+
+      if (
+        newPassword !==
+        confirmPassword
+      ) {
+        setPwdMsg(
+          "New password and confirm password do not match."
+        );
+
         return;
       }
 
-      setPwdMsg("Password changed successfully!");
+      if (
+        !oldPassword ||
+        !newPassword ||
+        !confirmPassword
+      ) {
+        setPwdMsg(
+          "Please fill all password fields."
+        );
 
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      console.error(error);
-      setPwdMsg("Something went wrong.");
-    }
-  };
+        return;
+      }
+
+      try {
+        const response =
+          await fetch(
+            `${API_URL}/api/auth/change-password`,
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Authorization: `Bearer ${token}`,
+              },
+
+              body: JSON.stringify({
+                oldPassword,
+                newPassword,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          setPwdMsg(
+            data.message ||
+              "Failed to change password"
+          );
+
+          return;
+        }
+
+        setPwdMsg(
+          "Password changed successfully!"
+        );
+
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } catch (error) {
+        console.error(error);
+
+        setPwdMsg(
+          "Something went wrong."
+        );
+      }
+    };
+
+  /* ================= NAVIGATION ================= */
 
   const openProfile = () => {
     setActiveTab("PROFILE");
@@ -238,7 +630,10 @@ export default function EmployeeDashboard() {
   };
 
   const openLeaves = () => {
-    setActiveTab("REQUISITIONS");
+    setActiveTab(
+      "REQUISITIONS"
+    );
+
     setCurrentView("leaves");
     setSidebarOpen(false);
   };
@@ -251,59 +646,115 @@ export default function EmployeeDashboard() {
 
   const openReports = () => {
     setActiveTab("REPORTS");
+    setCurrentView("reports");
     setSidebarOpen(false);
   };
 
-  const getInitials = () => {
-    const name =
-      user.name || user.employeeName || user.email || "User";
+  /* ================= INITIALS ================= */
 
-    return name
+  const getInitials = () => {
+    const displayName =
+      user.name ||
+      user.employeeName ||
+      user.email ||
+      "User";
+
+    return displayName
       .split(" ")
       .slice(0, 2)
-      .map((word) => word.charAt(0).toUpperCase())
+      .map((word) =>
+        word
+          .charAt(0)
+          .toUpperCase()
+      )
       .join("");
   };
 
-  const getStatusClass = (status) => {
-    const value = String(status || "").toLowerCase();
+  /* ================= STATUS ================= */
 
-    if (value.includes("approved")) {
+  const getStatusClass = (
+    status
+  ) => {
+    const value = String(
+      status || ""
+    ).toLowerCase();
+
+    if (
+      value.includes("approved")
+    ) {
       return "bg-emerald-50 text-emerald-700 border border-emerald-200";
     }
 
-    if (value.includes("reject")) {
+    if (
+      value.includes("reject")
+    ) {
       return "bg-red-50 text-red-700 border border-red-200";
     }
 
     return "bg-amber-50 text-amber-700 border border-amber-200";
   };
 
+  /* ================= TOTAL USED ================= */
+
+  const totalUsedLeaves =
+    Object.values(
+      leaveBalance
+    ).reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item.used || 0
+        ),
+      0
+    );
+
+  const totalRemainingLeaves =
+    Object.values(
+      leaveBalance
+    ).reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item.remaining || 0
+        ),
+      0
+    );
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
 
       {/* MOBILE OVERLAY */}
+
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() =>
+            setSidebarOpen(false)
+          }
         />
       )}
 
       {/* SIDEBAR */}
+
       <aside
         className={`
           fixed left-0 top-0 z-50 h-screen w-72
           bg-slate-950 text-white shadow-2xl
           transition-transform duration-300
           lg:translate-x-0
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          ${
+            sidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+          }
         `}
       >
         <div className="flex h-full flex-col">
 
           {/* LOGO */}
+
           <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.25em] text-orange-400">
                 Leave Management
@@ -315,15 +766,20 @@ export default function EmployeeDashboard() {
             </div>
 
             <button
-              onClick={() => setSidebarOpen(false)}
+              onClick={() =>
+                setSidebarOpen(false)
+              }
               className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden"
             >
               ✕
             </button>
+
           </div>
 
           {/* USER CARD */}
+
           <div className="mx-4 mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+
             <div className="flex items-center gap-3">
 
               {picture ? (
@@ -339,6 +795,7 @@ export default function EmployeeDashboard() {
               )}
 
               <div className="min-w-0">
+
                 <p className="truncate font-semibold">
                   {user.name ||
                     user.employeeName ||
@@ -346,13 +803,18 @@ export default function EmployeeDashboard() {
                 </p>
 
                 <p className="truncate text-xs text-slate-400">
-                  {user.email || "Employee Account"}
+                  {user.email ||
+                    "Employee Account"}
                 </p>
+
               </div>
+
             </div>
+
           </div>
 
           {/* NAVIGATION */}
+
           <nav className="mt-6 flex-1 space-y-2 px-4">
 
             <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -364,15 +826,22 @@ export default function EmployeeDashboard() {
               className={`
                 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition
                 ${
-                  currentView === "profile" &&
-                  activeTab === "PROFILE"
+                  currentView ===
+                    "profile" &&
+                  activeTab ===
+                    "PROFILE"
                     ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
                     : "text-slate-300 hover:bg-white/10 hover:text-white"
                 }
               `}
             >
-              <span className="text-lg">👤</span>
-              <span className="font-medium">My Profile</span>
+              <span className="text-lg">
+                👤
+              </span>
+
+              <span className="font-medium">
+                My Profile
+              </span>
             </button>
 
             <button
@@ -380,13 +849,17 @@ export default function EmployeeDashboard() {
               className={`
                 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition
                 ${
-                  currentView === "leaves"
+                  currentView ===
+                  "leaves"
                     ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
                     : "text-slate-300 hover:bg-white/10 hover:text-white"
                 }
               `}
             >
-              <span className="text-lg">📋</span>
+              <span className="text-lg">
+                📋
+              </span>
+
               <span className="font-medium">
                 Leave Requisitions
               </span>
@@ -397,13 +870,17 @@ export default function EmployeeDashboard() {
               className={`
                 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition
                 ${
-                  currentView === "password"
+                  currentView ===
+                  "password"
                     ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
                     : "text-slate-300 hover:bg-white/10 hover:text-white"
                 }
               `}
             >
-              <span className="text-lg">🔐</span>
+              <span className="text-lg">
+                🔐
+              </span>
+
               <span className="font-medium">
                 Change Password
               </span>
@@ -414,51 +891,69 @@ export default function EmployeeDashboard() {
               className={`
                 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition
                 ${
-                  activeTab === "REPORTS"
+                  activeTab ===
+                  "REPORTS"
                     ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
                     : "text-slate-300 hover:bg-white/10 hover:text-white"
                 }
               `}
             >
-              <span className="text-lg">📊</span>
-              <span className="font-medium">Reports</span>
+              <span className="text-lg">
+                📊
+              </span>
+
+              <span className="font-medium">
+                Reports
+              </span>
             </button>
 
           </nav>
 
           {/* LOGOUT */}
+
           <div className="border-t border-white/10 p-4">
+
             <button
               onClick={logout}
               className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
             >
-              <span className="text-lg">↪</span>
-              <span className="font-medium">Logout</span>
+              <span className="text-lg">
+                ↪
+              </span>
+
+              <span className="font-medium">
+                Logout
+              </span>
             </button>
+
           </div>
 
         </div>
       </aside>
 
       {/* MAIN */}
+
       <div className="min-h-screen lg:pl-72">
 
         {/* HEADER */}
+
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
 
           <div className="flex min-h-20 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
 
             <div className="flex items-center gap-3">
 
-              {/* MOBILE MENU */}
               <button
-                onClick={() => setSidebarOpen(true)}
+                onClick={() =>
+                  setSidebarOpen(true)
+                }
                 className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:bg-slate-50 lg:hidden"
               >
                 ☰
               </button>
 
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
                   Welcome back
                 </p>
@@ -468,12 +963,15 @@ export default function EmployeeDashboard() {
                     user.employeeName ||
                     "Employee"}
                 </h2>
+
               </div>
+
             </div>
 
             <div className="hidden items-center gap-4 sm:flex">
 
               <div className="text-right">
+
                 <p className="text-xs text-slate-400">
                   Today
                 </p>
@@ -481,6 +979,7 @@ export default function EmployeeDashboard() {
                 <p className="text-sm font-semibold text-slate-700">
                   {today}
                 </p>
+
               </div>
 
               <div className="h-10 w-px bg-slate-200" />
@@ -498,10 +997,13 @@ export default function EmployeeDashboard() {
               )}
 
             </div>
+
           </div>
 
           {/* TOP TABS */}
+
           <div className="overflow-x-auto border-t border-slate-100">
+
             <div className="flex min-w-max px-4 sm:px-6 lg:px-8">
 
               <button
@@ -509,7 +1011,8 @@ export default function EmployeeDashboard() {
                 className={`
                   border-b-2 px-4 py-3 text-sm font-semibold transition
                   ${
-                    activeTab === "PROFILE"
+                    activeTab ===
+                    "PROFILE"
                       ? "border-orange-500 text-orange-600"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }
@@ -523,7 +1026,8 @@ export default function EmployeeDashboard() {
                 className={`
                   border-b-2 px-4 py-3 text-sm font-semibold transition
                   ${
-                    activeTab === "REQUISITIONS"
+                    activeTab ===
+                    "REQUISITIONS"
                       ? "border-orange-500 text-orange-600"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }
@@ -537,7 +1041,8 @@ export default function EmployeeDashboard() {
                 className={`
                   border-b-2 px-4 py-3 text-sm font-semibold transition
                   ${
-                    activeTab === "REPORTS"
+                    activeTab ===
+                    "REPORTS"
                       ? "border-orange-500 text-orange-600"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }
@@ -547,22 +1052,27 @@ export default function EmployeeDashboard() {
               </button>
 
             </div>
+
           </div>
+
         </header>
 
         {/* CONTENT */}
+
         <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
 
           {/* ================= PROFILE ================= */}
 
-          {activeTab === "PROFILE" &&
-            currentView === "profile" && (
+          {activeTab ===
+            "PROFILE" &&
+            currentView ===
+              "profile" && (
               <div className="space-y-6">
 
-                {/* PAGE TITLE */}
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
 
                   <div>
+
                     <p className="text-sm font-semibold text-orange-500">
                       EMPLOYEE PROFILE
                     </p>
@@ -574,10 +1084,15 @@ export default function EmployeeDashboard() {
                     <p className="mt-1 text-sm text-slate-500">
                       View and manage your employee information.
                     </p>
+
                   </div>
 
                   <button
-                    onClick={() => setEditOpen(true)}
+                    onClick={() =>
+                      setEditOpen(
+                        true
+                      )
+                    }
                     className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600 active:scale-[0.98]"
                   >
                     ✎ Edit Profile
@@ -586,6 +1101,7 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {/* PROFILE HERO */}
+
                 <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-orange-950 p-6 text-white shadow-xl sm:p-8">
 
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -615,7 +1131,8 @@ export default function EmployeeDashboard() {
                       </h2>
 
                       <p className="mt-2 break-all text-sm text-slate-300">
-                        {user.email || "No email available"}
+                        {user.email ||
+                          "No email available"}
                       </p>
 
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -633,15 +1150,19 @@ export default function EmployeeDashboard() {
                         )}
 
                       </div>
+
                     </div>
 
                   </div>
+
                 </div>
 
                 {/* DETAILS */}
+
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
 
                   <div className="mb-6">
+
                     <h3 className="text-lg font-bold text-slate-900">
                       Employee Details
                     </h3>
@@ -649,6 +1170,7 @@ export default function EmployeeDashboard() {
                     <p className="text-sm text-slate-500">
                       Your current employment information.
                     </p>
+
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -657,6 +1179,7 @@ export default function EmployeeDashboard() {
                       label="Employee ID"
                       value={
                         user.employeeId ||
+                        user.empCode ||
                         user.id ||
                         "-"
                       }
@@ -664,54 +1187,84 @@ export default function EmployeeDashboard() {
                     />
 
                     <InfoCard
+                      label="Full Name"
+                      value={
+                        user.name ||
+                        user.employeeName ||
+                        "-"
+                      }
+                      icon="👤"
+                    />
+
+                    <InfoCard
                       label="Email"
-                      value={user.email || "-"}
+                      value={
+                        user.email ||
+                        "-"
+                      }
                       icon="✉️"
                     />
 
                     <InfoCard
                       label="Department"
-                      value={department || "-"}
+                      value={
+                        department ||
+                        "-"
+                      }
                       icon="🏢"
                     />
 
                     <InfoCard
                       label="Designation"
-                      value={designation || "-"}
+                      value={
+                        designation ||
+                        "-"
+                      }
                       icon="💼"
                     />
 
                     <InfoCard
                       label="Phone"
-                      value={phone || "-"}
+                      value={
+                        phone || "-"
+                      }
                       icon="📱"
                     />
 
                     <InfoCard
                       label="Cost Center"
-                      value={costCenter || "-"}
+                      value={
+                        costCenter ||
+                        "-"
+                      }
                       icon="💰"
                     />
 
                     <InfoCard
                       label="Date of Birth"
-                      value={dob || "-"}
+                      value={
+                        dob || "-"
+                      }
                       icon="🎂"
                     />
 
                   </div>
+
                 </div>
 
               </div>
             )}
 
-          {/* ================= LEAVE ================= */}
+          {/* ================= LEAVE REQUISITIONS ================= */}
 
-          {activeTab === "REQUISITIONS" &&
-            currentView === "leaves" && (
+          {activeTab ===
+            "REQUISITIONS" &&
+            currentView ===
+              "leaves" && (
               <div className="space-y-6">
 
                 <div>
+
                   <p className="text-sm font-semibold text-orange-500">
                     LEAVE MANAGEMENT
                   </p>
@@ -721,11 +1274,92 @@ export default function EmployeeDashboard() {
                   </h1>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Apply for leave and track your previous requests.
+                    Apply for leave and track your leave balance.
                   </p>
+
                 </div>
 
-                {/* APPLY FORM */}
+                {/* ================= LEAVE BALANCE SUMMARY ================= */}
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+
+                  <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                    <div>
+
+                      <h2 className="text-lg font-bold text-slate-900">
+                        My Leave Balance
+                      </h2>
+
+                      <p className="text-sm text-slate-500">
+                        Your available leave balance for {balanceYear}.
+                      </p>
+
+                    </div>
+
+                    <div className="flex items-center gap-3">
+
+                      <span className="rounded-full bg-orange-50 px-4 py-2 text-xs font-bold text-orange-600">
+                        Total Used:{" "}
+                        {totalUsedLeaves}
+                      </span>
+
+                      <span className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-600">
+                        Remaining:{" "}
+                        {totalRemainingLeaves}
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                  {balanceLoading ? (
+
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+
+                      {[1, 2, 3, 4, 5].map(
+                        (item) => (
+                          <div
+                            key={item}
+                            className="h-40 animate-pulse rounded-2xl bg-slate-100"
+                          />
+                        )
+                      )}
+
+                    </div>
+
+                  ) : (
+
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+
+                      {[
+                        "CL",
+                        "SL",
+                        "EL",
+                        "LWP",
+                        "CO",
+                      ].map(
+                        (type) => (
+                          <LeaveBalanceCard
+                            key={type}
+                            type={type}
+                            data={
+                              leaveBalance[
+                                type
+                              ]
+                            }
+                          />
+                        )
+                      )}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+                {/* ================= APPLY LEAVE ================= */}
+
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
 
                   <div className="mb-6 flex items-start gap-3">
@@ -735,6 +1369,7 @@ export default function EmployeeDashboard() {
                     </div>
 
                     <div>
+
                       <h2 className="text-lg font-bold text-slate-900">
                         Apply for Leave
                       </h2>
@@ -742,26 +1377,40 @@ export default function EmployeeDashboard() {
                       <p className="text-sm text-slate-500">
                         Submit a new leave request.
                       </p>
+
                     </div>
 
                   </div>
 
-                  <form onSubmit={handleApplyLeave}>
+                  <form
+                    onSubmit={
+                      handleApplyLeave
+                    }
+                  >
 
                     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
 
+                      {/* LEAVE TYPE */}
+
                       <div>
+
                         <label className="mb-2 block text-sm font-semibold text-slate-700">
                           Leave Type
                         </label>
 
                         <select
-                          value={leaveType}
+                          value={
+                            leaveType
+                          }
                           onChange={(e) =>
-                            setLeaveType(e.target.value)
+                            setLeaveType(
+                              e.target
+                                .value
+                            )
                           }
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                         >
+
                           <option value="CL">
                             Casual Leave
                           </option>
@@ -777,77 +1426,231 @@ export default function EmployeeDashboard() {
                           <option value="LWP">
                             Leave Without Pay
                           </option>
+
+                          <option value="CO">
+                            Comp Off
+                          </option>
+
                         </select>
+
+                        {/* SELECTED BALANCE */}
+
+                        <div className="mt-2 rounded-xl bg-orange-50 px-3 py-2">
+
+                          <p className="text-xs text-orange-600">
+                            Available{" "}
+                            {
+                              LEAVE_NAMES[
+                                leaveType
+                              ]
+                            }
+                          </p>
+
+                          <p className="text-sm font-bold text-orange-700">
+                            {
+                              selectedBalance.remaining
+                            }{" "}
+                            day
+                            {selectedBalance.remaining !==
+                            1
+                              ? "s"
+                              : ""}{" "}
+                            remaining
+                          </p>
+
+                        </div>
+
                       </div>
 
+                      {/* START DATE */}
+
                       <div>
+
                         <label className="mb-2 block text-sm font-semibold text-slate-700">
                           Start Date
                         </label>
 
                         <input
                           type="date"
-                          value={startDate}
+                          value={
+                            startDate
+                          }
                           onChange={(e) =>
-                            setStartDate(e.target.value)
+                            setStartDate(
+                              e.target
+                                .value
+                            )
                           }
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                         />
+
                       </div>
 
+                      {/* END DATE */}
+
                       <div>
+
                         <label className="mb-2 block text-sm font-semibold text-slate-700">
                           End Date
                         </label>
 
                         <input
                           type="date"
-                          value={endDate}
+                          value={
+                            endDate
+                          }
+                          min={
+                            startDate ||
+                            undefined
+                          }
                           onChange={(e) =>
-                            setEndDate(e.target.value)
+                            setEndDate(
+                              e.target
+                                .value
+                            )
                           }
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                         />
+
+                        {requestedDays >
+                          0 && (
+                          <p className="mt-2 text-xs font-semibold text-slate-500">
+                            Requested:{" "}
+                            {
+                              requestedDays
+                            }{" "}
+                            day
+                            {requestedDays !==
+                            1
+                              ? "s"
+                              : ""}
+                          </p>
+                        )}
+
                       </div>
 
+                      {/* REASON */}
+
                       <div>
+
                         <label className="mb-2 block text-sm font-semibold text-slate-700">
                           Reason
                         </label>
 
                         <input
                           type="text"
-                          value={reason}
+                          value={
+                            reason
+                          }
                           onChange={(e) =>
-                            setReason(e.target.value)
+                            setReason(
+                              e.target
+                                .value
+                            )
                           }
                           placeholder="Enter reason"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                         />
+
                       </div>
 
                     </div>
+
+                    {/* BALANCE WARNING */}
+
+                    {requestedDays >
+                      0 &&
+                      requestedDays >
+                        selectedBalance.remaining && (
+                        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+
+                          <div className="flex gap-3">
+
+                            <span className="text-xl">
+                              ⚠️
+                            </span>
+
+                            <div>
+
+                              <p className="font-semibold text-red-700">
+                                Insufficient Leave Balance
+                              </p>
+
+                              <p className="mt-1 text-sm text-red-600">
+                                You have{" "}
+                                <strong>
+                                  {
+                                    selectedBalance.remaining
+                                  }
+                                </strong>{" "}
+                                {
+                                  LEAVE_NAMES[
+                                    leaveType
+                                  ]
+                                }{" "}
+                                remaining, but you are requesting{" "}
+                                <strong>
+                                  {
+                                    requestedDays
+                                  }
+                                </strong>{" "}
+                                day
+                                {requestedDays !==
+                                1
+                                  ? "s"
+                                  : ""}.
+                              </p>
+
+                            </div>
+
+                          </div>
+
+                        </div>
+                      )}
+
+                    {/* SUBMIT */}
 
                     <div className="mt-6 flex justify-end">
 
                       <button
                         type="submit"
-                        className="w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600 sm:w-auto"
+                        disabled={
+                          !canApplySelectedLeave
+                        }
+                        className={`
+                          w-full rounded-xl px-6 py-3 font-semibold text-white shadow-lg transition sm:w-auto
+                          ${
+                            canApplySelectedLeave
+                              ? "bg-orange-500 shadow-orange-500/20 hover:bg-orange-600"
+                              : "cursor-not-allowed bg-slate-300 shadow-none"
+                          }
+                        `}
                       >
-                        Submit Leave Request →
+                        {selectedBalance.remaining <=
+                        0
+                          ? "No Balance Available"
+                          : requestedDays >
+                              0 &&
+                            requestedDays >
+                              selectedBalance.remaining
+                          ? "Insufficient Balance"
+                          : "Submit Leave Request →"}
                       </button>
 
                     </div>
 
                   </form>
+
                 </div>
 
-                {/* HISTORY */}
+                {/* ================= LEAVE HISTORY ================= */}
+
                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
 
                   <div className="flex flex-col gap-2 border-b border-slate-100 p-5 sm:p-7 md:flex-row md:items-center md:justify-between">
 
                     <div>
+
                       <h2 className="text-lg font-bold text-slate-900">
                         Leave History
                       </h2>
@@ -855,16 +1658,22 @@ export default function EmployeeDashboard() {
                       <p className="text-sm text-slate-500">
                         Track your submitted leave requests.
                       </p>
+
                     </div>
 
                     <span className="w-fit rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-600">
-                      {leaves.length} Request
-                      {leaves.length !== 1 ? "s" : ""}
+                      {leaves.length}{" "}
+                      Request
+                      {leaves.length !==
+                      1
+                        ? "s"
+                        : ""}
                     </span>
 
                   </div>
 
-                  {leaves.length === 0 ? (
+                  {leaves.length ===
+                  0 ? (
 
                     <div className="px-5 py-16 text-center">
 
@@ -886,13 +1695,18 @@ export default function EmployeeDashboard() {
 
                     <div className="overflow-x-auto">
 
-                      <table className="w-full min-w-[700px] text-left text-sm">
+                      <table className="w-full min-w-[750px] text-left text-sm">
 
                         <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
 
                           <tr>
+
                             <th className="px-5 py-4 font-semibold">
                               Type
+                            </th>
+
+                            <th className="px-5 py-4 font-semibold">
+                              Days
                             </th>
 
                             <th className="px-5 py-4 font-semibold">
@@ -910,71 +1724,106 @@ export default function EmployeeDashboard() {
                             <th className="px-5 py-4 font-semibold">
                               Status
                             </th>
+
                           </tr>
 
                         </thead>
 
                         <tbody className="divide-y divide-slate-100">
 
-                          {leaves.map((leave, index) => (
+                          {leaves.map(
+                            (
+                              leave,
+                              index
+                            ) => {
 
-                            <tr
-                              key={
-                                leave._id ||
-                                leave.id ||
-                                index
-                              }
-                              className="transition hover:bg-slate-50"
-                            >
+                              const days =
+                                calculateDays(
+                                  leave.startDate,
+                                  leave.endDate
+                                );
 
-                              <td className="px-5 py-4">
-                                <span className="font-semibold text-slate-800">
-                                  {leave.leaveType ||
-                                    leave.type ||
-                                    "-"}
-                                </span>
-                              </td>
-
-                              <td className="px-5 py-4 text-slate-600">
-                                {leave.startDate
-                                  ? new Date(
-                                      leave.startDate
-                                    ).toLocaleDateString(
-                                      "en-IN"
-                                    )
-                                  : "-"}
-                              </td>
-
-                              <td className="px-5 py-4 text-slate-600">
-                                {leave.endDate
-                                  ? new Date(
-                                      leave.endDate
-                                    ).toLocaleDateString(
-                                      "en-IN"
-                                    )
-                                  : "-"}
-                              </td>
-
-                              <td className="max-w-xs px-5 py-4 text-slate-600">
-                                <p className="truncate">
-                                  {leave.reason || "-"}
-                                </p>
-                              </td>
-
-                              <td className="px-5 py-4">
-                                <span
-                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
-                                    leave.status
-                                  )}`}
+                              return (
+                                <tr
+                                  key={
+                                    leave._id ||
+                                    leave.id ||
+                                    index
+                                  }
+                                  className="transition hover:bg-slate-50"
                                 >
-                                  {leave.status ||
-                                    "Pending"}
-                                </span>
-                              </td>
 
-                            </tr>
+                                  <td className="px-5 py-4">
 
-                          ))}
+                                    <span className="font-semibold text-slate-800">
+                                      {leave.leaveType ||
+                                        "-"}
+                                    </span>
+
+                                    <p className="mt-0.5 text-xs text-slate-400">
+                                      {
+                                        LEAVE_NAMES[
+                                          leave.leaveType
+                                        ]
+                                      }
+                                    </p>
+
+                                  </td>
+
+                                  <td className="px-5 py-4">
+
+                                    <span className="font-semibold text-slate-700">
+                                      {days}
+                                    </span>
+
+                                  </td>
+
+                                  <td className="px-5 py-4 text-slate-600">
+                                    {leave.startDate
+                                      ? new Date(
+                                          leave.startDate
+                                        ).toLocaleDateString(
+                                          "en-IN"
+                                        )
+                                      : "-"}
+                                  </td>
+
+                                  <td className="px-5 py-4 text-slate-600">
+                                    {leave.endDate
+                                      ? new Date(
+                                          leave.endDate
+                                        ).toLocaleDateString(
+                                          "en-IN"
+                                        )
+                                      : "-"}
+                                  </td>
+
+                                  <td className="max-w-xs px-5 py-4 text-slate-600">
+
+                                    <p className="truncate">
+                                      {leave.reason ||
+                                        "-"}
+                                    </p>
+
+                                  </td>
+
+                                  <td className="px-5 py-4">
+
+                                    <span
+                                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+                                        leave.status
+                                      )}`}
+                                    >
+                                      {leave.status ||
+                                        "Pending"}
+                                    </span>
+
+                                  </td>
+
+                                </tr>
+                              );
+                            }
+                          )}
 
                         </tbody>
 
@@ -991,8 +1840,10 @@ export default function EmployeeDashboard() {
 
           {/* ================= PASSWORD ================= */}
 
-          {activeTab === "PROFILE" &&
-            currentView === "password" && (
+          {activeTab ===
+            "PROFILE" &&
+            currentView ===
+              "password" && (
               <div className="mx-auto max-w-2xl">
 
                 <div className="mb-6">
@@ -1020,6 +1871,7 @@ export default function EmployeeDashboard() {
                     </div>
 
                     <div>
+
                       <h2 className="font-bold text-slate-900">
                         Update Password
                       </h2>
@@ -1027,40 +1879,57 @@ export default function EmployeeDashboard() {
                       <p className="text-sm text-slate-500">
                         Enter your current password and choose a new one.
                       </p>
+
                     </div>
 
                   </div>
 
                   <form
-                    onSubmit={handleChangePassword}
+                    onSubmit={
+                      handleChangePassword
+                    }
                     className="space-y-5"
                   >
 
                     <PasswordInput
                       label="Current Password"
-                      value={oldPassword}
-                      onChange={setOldPassword}
+                      value={
+                        oldPassword
+                      }
+                      onChange={
+                        setOldPassword
+                      }
                       placeholder="Enter current password"
                     />
 
                     <PasswordInput
                       label="New Password"
-                      value={newPassword}
-                      onChange={setNewPassword}
+                      value={
+                        newPassword
+                      }
+                      onChange={
+                        setNewPassword
+                      }
                       placeholder="Enter new password"
                     />
 
                     <PasswordInput
                       label="Confirm New Password"
-                      value={confirmPassword}
-                      onChange={setConfirmPassword}
+                      value={
+                        confirmPassword
+                      }
+                      onChange={
+                        setConfirmPassword
+                      }
                       placeholder="Confirm new password"
                     />
 
                     {pwdMsg && (
                       <div
                         className={`rounded-xl px-4 py-3 text-sm font-medium ${
-                          pwdMsg.includes("successfully")
+                          pwdMsg.includes(
+                            "successfully"
+                          )
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-red-50 text-red-700"
                         }`}
@@ -1085,10 +1954,12 @@ export default function EmployeeDashboard() {
 
           {/* ================= REPORTS ================= */}
 
-          {activeTab === "REPORTS" && (
+          {activeTab ===
+            "REPORTS" && (
             <div className="space-y-6">
 
               <div>
+
                 <p className="text-sm font-semibold text-orange-500">
                   ANALYTICS
                 </p>
@@ -1100,23 +1971,34 @@ export default function EmployeeDashboard() {
                 <p className="mt-1 text-sm text-slate-500">
                   View your leave-related reports and insights.
                 </p>
+
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {/* SUMMARY */}
+
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
                 <StatCard
                   title="Total Requests"
-                  value={leaves.length}
+                  value={
+                    leaves.length
+                  }
                   icon="📋"
                 />
 
                 <StatCard
                   title="Pending"
                   value={
-                    leaves.filter((leave) =>
-                      String(leave.status || "")
-                        .toLowerCase()
-                        .includes("pending")
+                    leaves.filter(
+                      (leave) =>
+                        String(
+                          leave.status ||
+                            ""
+                        )
+                          .toLowerCase()
+                          .includes(
+                            "pending"
+                          )
                     ).length
                   }
                   icon="⏳"
@@ -1125,32 +2007,70 @@ export default function EmployeeDashboard() {
                 <StatCard
                   title="Approved"
                   value={
-                    leaves.filter((leave) =>
-                      String(leave.status || "")
-                        .toLowerCase()
-                        .includes("approved")
+                    leaves.filter(
+                      (leave) =>
+                        String(
+                          leave.status ||
+                            ""
+                        )
+                          .toLowerCase()
+                          .includes(
+                            "approved"
+                          )
                     ).length
                   }
                   icon="✓"
                 />
 
+                <StatCard
+                  title="Remaining Leaves"
+                  value={
+                    totalRemainingLeaves
+                  }
+                  icon="🏖️"
+                />
+
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              {/* BALANCE REPORT */}
 
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-orange-50 text-4xl">
-                  📊
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+
+                <div className="mb-6">
+
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Leave Balance Report
+                  </h2>
+
+                  <p className="text-sm text-slate-500">
+                    Your leave balance for {balanceYear}.
+                  </p>
+
                 </div>
 
-                <h2 className="mt-5 text-xl font-bold text-slate-900">
-                  Reports Dashboard
-                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 
-                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-                  Detailed leave analytics can be added here later,
-                  including monthly leave trends, leave balance and
-                  department-wise reports.
-                </p>
+                  {[
+                    "CL",
+                    "SL",
+                    "EL",
+                    "LWP",
+                    "CO",
+                  ].map(
+                    (type) => (
+                      <LeaveBalanceCard
+                        key={type}
+                        type={type}
+                        data={
+                          leaveBalance[
+                            type
+                          ]
+                        }
+                      />
+                    )
+                  )}
+
+                </div>
 
               </div>
 
@@ -1158,6 +2078,7 @@ export default function EmployeeDashboard() {
           )}
 
         </main>
+
       </div>
 
       {/* ================= EDIT PROFILE MODAL ================= */}
@@ -1167,10 +2088,12 @@ export default function EmployeeDashboard() {
 
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
 
-            {/* MODAL HEADER */}
+            {/* HEADER */}
+
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-5 sm:px-7">
 
               <div>
+
                 <h2 className="text-xl font-bold text-slate-900">
                   Edit Profile
                 </h2>
@@ -1178,10 +2101,15 @@ export default function EmployeeDashboard() {
                 <p className="mt-1 text-sm text-slate-500">
                   Update your employee information.
                 </p>
+
               </div>
 
               <button
-                onClick={() => setEditOpen(false)}
+                onClick={() =>
+                  setEditOpen(
+                    false
+                  )
+                }
                 className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               >
                 ✕
@@ -1192,6 +2120,7 @@ export default function EmployeeDashboard() {
             <div className="space-y-6 p-5 sm:p-7">
 
               {/* PROFILE PICTURE */}
+
               <div className="rounded-2xl bg-slate-50 p-5">
 
                 <p className="mb-4 text-sm font-semibold text-slate-700">
@@ -1221,7 +2150,9 @@ export default function EmployeeDashboard() {
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={handleImageUpload}
+                        onChange={
+                          handleImageUpload
+                        }
                         className="hidden"
                       />
 
@@ -1238,33 +2169,57 @@ export default function EmployeeDashboard() {
               </div>
 
               {/* FORM FIELDS */}
+
               <div className="grid gap-5 sm:grid-cols-2">
 
                 <FormInput
+                  label="Full Name"
+                  value={name}
+                  onChange={
+                    setName
+                  }
+                  placeholder="Enter your full name"
+                />
+
+                <FormInput
                   label="Department"
-                  value={department}
-                  onChange={setDepartment}
+                  value={
+                    department
+                  }
+                  onChange={
+                    setDepartment
+                  }
                   placeholder="Enter department"
                 />
 
                 <FormInput
                   label="Designation"
-                  value={designation}
-                  onChange={setDesignation}
+                  value={
+                    designation
+                  }
+                  onChange={
+                    setDesignation
+                  }
                   placeholder="Enter designation"
                 />
 
                 <FormInput
                   label="Phone"
                   value={phone}
-                  onChange={setPhone}
+                  onChange={
+                    setPhone
+                  }
                   placeholder="Enter phone number"
                 />
 
                 <FormInput
                   label="Cost Center"
-                  value={costCenter}
-                  onChange={setCostCenter}
+                  value={
+                    costCenter
+                  }
+                  onChange={
+                    setCostCenter
+                  }
                   placeholder="Enter cost center"
                 />
 
@@ -1272,7 +2227,9 @@ export default function EmployeeDashboard() {
                   label="Date of Birth"
                   type="date"
                   value={dob}
-                  onChange={setDob}
+                  onChange={
+                    setDob
+                  }
                   placeholder=""
                 />
 
@@ -1280,18 +2237,25 @@ export default function EmployeeDashboard() {
 
             </div>
 
-            {/* MODAL FOOTER */}
+            {/* FOOTER */}
+
             <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-5 py-5 sm:flex-row sm:justify-end sm:px-7">
 
               <button
-                onClick={() => setEditOpen(false)}
+                onClick={() =>
+                  setEditOpen(
+                    false
+                  )
+                }
                 className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
               >
                 Cancel
               </button>
 
               <button
-                onClick={handleUpdateProfile}
+                onClick={
+                  handleUpdateProfile
+                }
                 className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 hover:bg-orange-600"
               >
                 Save Changes
@@ -1300,16 +2264,143 @@ export default function EmployeeDashboard() {
             </div>
 
           </div>
+
         </div>
       )}
+
     </div>
   );
 }
 
 
-/* ================= INFO CARD ================= */
+/* =====================================================
+   LEAVE BALANCE CARD
+===================================================== */
 
-function InfoCard({ label, value, icon }) {
+function LeaveBalanceCard({
+  type,
+  data,
+}) {
+  const allowed =
+    Number(data?.allowed || 0);
+
+  const used =
+    Number(data?.used || 0);
+
+  const remaining =
+    Number(data?.remaining || 0);
+
+  const percentage =
+    allowed > 0
+      ? Math.min(
+          (used / allowed) * 100,
+          100
+        )
+      : 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-1 hover:border-orange-200 hover:bg-orange-50/50">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <p className="text-lg font-bold text-slate-900">
+            {type}
+          </p>
+
+          <p className="text-xs text-slate-500">
+            {LEAVE_NAMES[type]}
+          </p>
+
+        </div>
+
+        <div
+          className={`
+            flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold
+            ${
+              remaining === 0
+                ? "bg-red-100 text-red-600"
+                : "bg-emerald-100 text-emerald-600"
+            }
+          `}
+        >
+          {remaining}
+        </div>
+
+      </div>
+
+      <div className="mt-5">
+
+        <div className="flex items-center justify-between text-xs">
+
+          <span className="font-medium text-slate-500">
+            Used
+          </span>
+
+          <span className="font-bold text-slate-700">
+            {used} / {allowed}
+          </span>
+
+        </div>
+
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+
+          <div
+            className="h-full rounded-full bg-orange-500 transition-all duration-500"
+            style={{
+              width: `${percentage}%`,
+            }}
+          />
+
+        </div>
+
+      </div>
+
+      <div className="mt-3 flex items-center justify-between">
+
+        <span className="text-xs text-slate-500">
+          Total
+        </span>
+
+        <span className="text-sm font-bold text-slate-800">
+          {allowed}
+        </span>
+
+      </div>
+
+      <div className="mt-1 flex items-center justify-between">
+
+        <span className="text-xs text-slate-500">
+          Remaining
+        </span>
+
+        <span
+          className={`text-sm font-bold ${
+            remaining === 0
+              ? "text-red-600"
+              : "text-emerald-600"
+          }`}
+        >
+          {remaining}
+        </span>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+/* =====================================================
+   INFO CARD
+===================================================== */
+
+function InfoCard({
+  label,
+  value,
+  icon,
+}) {
   return (
     <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-orange-200 hover:bg-orange-50/50">
 
@@ -1332,14 +2423,21 @@ function InfoCard({ label, value, icon }) {
         </div>
 
       </div>
+
     </div>
   );
 }
 
 
-/* ================= STAT CARD ================= */
+/* =====================================================
+   STAT CARD
+===================================================== */
 
-function StatCard({ title, value, icon }) {
+function StatCard({
+  title,
+  value,
+  icon,
+}) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
 
@@ -1362,12 +2460,15 @@ function StatCard({ title, value, icon }) {
         </div>
 
       </div>
+
     </div>
   );
 }
 
 
-/* ================= FORM INPUT ================= */
+/* =====================================================
+   FORM INPUT
+===================================================== */
 
 function FormInput({
   label,
@@ -1386,8 +2487,14 @@ function FormInput({
       <input
         type={type}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        onChange={(e) =>
+          onChange(
+            e.target.value
+          )
+        }
+        placeholder={
+          placeholder
+        }
         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
       />
 
@@ -1396,7 +2503,9 @@ function FormInput({
 }
 
 
-/* ================= PASSWORD INPUT ================= */
+/* =====================================================
+   PASSWORD INPUT
+===================================================== */
 
 function PasswordInput({
   label,
@@ -1414,11 +2523,62 @@ function PasswordInput({
       <input
         type="password"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        onChange={(e) =>
+          onChange(
+            e.target.value
+          )
+        }
+        placeholder={
+          placeholder
+        }
         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
       />
 
     </div>
+  );
+}
+
+
+/* =====================================================
+   CALCULATE DAYS
+===================================================== */
+
+function calculateDays(
+  startDate,
+  endDate
+) {
+  if (
+    !startDate ||
+    !endDate
+  ) {
+    return 0;
+  }
+
+  const start =
+    new Date(startDate);
+
+  const end =
+    new Date(endDate);
+
+  if (
+    isNaN(start.getTime()) ||
+    isNaN(end.getTime())
+  ) {
+    return 0;
+  }
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  if (end < start) {
+    return 0;
+  }
+
+  return (
+    Math.floor(
+      (end.getTime() -
+        start.getTime()) /
+        (1000 * 60 * 60 * 24)
+    ) + 1
   );
 }
